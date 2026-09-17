@@ -14,3 +14,4 @@ assets/ultimate_modular_sci-fi_-_feb_2021/
 
 # Auto-backups the level builder writes before every save
 levels.json.bak.*
+*.bak
