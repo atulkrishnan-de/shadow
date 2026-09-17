@@ -1,6 +1,6 @@
 # SHADOW
 
-A top-down quarter-view puzzle game. Every time you die, your previous attempt comes back
+A top-down quarter-view metroidvania puzzle game. Every time you die, your previous run comes back
 as a Shadow that repeats exactly what you did. You solve each room by building a
 team out of your own failures.
 
@@ -20,12 +20,12 @@ directly off the filesystem works too.
 | key | |
 |---|---|
 | `W` `A` `S` `D` | move (floor plane) |
-| `SPACE` | jump (hold for height) |
-| `E` | interact — levers and buttons |
+| `SPACE` | dash (once unlocked) |
+| `E` | interact — buttons and levers |
 | `R` | die now, and leave a Shadow behind |
-| `1` / `2` / `3` | speed ×1 / ×2 / ×4 |
+| `Q` | anchor — hold as you die (once unlocked) |
 | `ESC` | pause |
-| `BACKSPACE` | restart the room from scratch |
+| `BACKSPACE` | restart from scratch |
 
 Dev entry points: `?level=3` jumps to a room, `?auto` skips the menu,
 `&skipintro=1` skips the title card, `&ghosts=4` materialises Shadows for
