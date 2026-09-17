@@ -283,6 +283,8 @@ const PROP_DEFS = {
   'scifi-access': { folder: 'scifi', file: 'Prop_AccessPoint', ext: 'gltf' },
   'scifi-chest': { folder: 'scifi', file: 'Prop_Chest', ext: 'gltf' },
   'scifi-wall': { folder: 'scifi', file: 'WallAstra_Straight', ext: 'gltf' },
+  'door-metal': { folder: 'doors', file: 'Door_Metal', ext: 'gltf' },
+  'door-frame': { folder: 'doors', file: 'Door_Frame_A', ext: 'gltf' },
 };
 const PROPS = Object.create(null);
 function loadProps() {
@@ -362,14 +364,19 @@ function poseFigure(rig, st, dt) {
   rig.legL.rotation.x = swing; rig.legR.rotation.x = -swing;
   rig.armL.rotation.x = -swing * 0.8; rig.armR.rotation.x = swing * 0.8;
   if (rig.isShadow && rig.mat) {
-    const t = performance.now() * 0.001;
-    rig.mat.uniforms.uTime.value = t;
-    const glitchRate = st.forceGlitch ? 0.35 : (rig.noGlitch ? 0 : 0.02);
-    rig.glitchT = Math.max(0, rig.glitchT - dt);
-    if (rig.glitchT <= 0 && Math.random() < glitchRate) rig.glitchT = 0.1 + Math.random() * 0.08;
-    rig.mat.uniforms.uGlitch.value = rig.glitchT > 0 ? 1 : 0;
-    rig.mat.uniforms.uOpacity.value = rig.baseOpacity != null ? rig.baseOpacity : 0.45;
-    if (rig.light) rig.light.intensity = 0.8 * rig.baseEmissive * (1 + Math.sin(t * 3 + rig.phase) * 0.3);
+    const farFromPlayer = G.player && ((st.x - G.player.x) * (st.x - G.player.x) + (st.z - G.player.z) * (st.z - G.player.z)) > 225;
+    if (!farFromPlayer) {
+      const t = performance.now() * 0.001;
+      rig.mat.uniforms.uTime.value = t;
+      const glitchRate = st.forceGlitch ? 0.35 : (rig.noGlitch ? 0 : 0.02);
+      rig.glitchT = Math.max(0, rig.glitchT - dt);
+      if (rig.glitchT <= 0 && Math.random() < glitchRate) rig.glitchT = 0.1 + Math.random() * 0.08;
+      rig.mat.uniforms.uGlitch.value = rig.glitchT > 0 ? 1 : 0;
+      rig.mat.uniforms.uOpacity.value = rig.baseOpacity != null ? rig.baseOpacity : 0.45;
+      if (rig.light) rig.light.intensity = 0.8 * rig.baseEmissive * (1 + Math.sin(t * 3 + rig.phase) * 0.3);
+    } else {
+      if (rig.light) rig.light.intensity = 0;
+    }
   }
 }
 
@@ -485,12 +492,37 @@ class Button {
 class Door {
   constructor(o) {
     this.o = o; this.open = 0; this.target = 0; this.timer = 0; this.wasReq = false;
-    const dw = o.w || 1.3, dh = 2.6, y = o.y || 0;
+    const dw = o.w || 2.4, dh = 2.6, y = o.y || 0;
     const g = new THREE.Group(); World.root.add(g); this.g = g; g.position.set(o.x, y, o.z);
-    box(0.35, dh + 0.5, dw + 0.6, M.steelDark, -0.5, 0, -dw / 2 - 0.3, g);
-    box(0.35, dh + 0.5, dw + 0.6, M.steelDark, 0.5, 0, -dw / 2 - 0.3, g);
-    box(dw + 1.0, 0.3, dw + 0.6, M.steelDark, -0.5, dh, -dw / 2 - 0.3, g);
-    this.slab = box(0.3, dh, dw, M.steel, -0.15, 0, -dw / 2, g);
+
+    const frameBase = PROPS['door-frame'];
+    if (frameBase) {
+      const frame = frameBase.clone();
+      const fScale = dw / 4.211;
+      const hScale = dh / 3.953;
+      frame.scale.set(fScale, hScale, fScale);
+      frame.rotation.y = Math.PI / 2;
+      g.add(frame);
+    } else {
+      box(0.35, dh + 0.3, 0.15, M.steelDark, -0.18, 0, -dw / 2 - 0.15, g);
+      box(0.35, dh + 0.3, 0.15, M.steelDark, -0.18, 0, dw / 2, g);
+      box(0.35, 0.15, dw + 0.3, M.steelDark, -0.18, dh, -dw / 2 - 0.15, g);
+    }
+
+    const panelBase = PROPS['door-metal'];
+    this.slabGroup = new THREE.Group(); g.add(this.slabGroup);
+    if (panelBase) {
+      const panel = panelBase.clone();
+      const pScaleX = dw / 0.241;
+      const pScaleY = dh / 4.049;
+      panel.scale.set(pScaleX, pScaleY, dw * 20);
+      panel.rotation.y = Math.PI / 2;
+      panel.position.set(0, 0, -dw / 2);
+      this.slabGroup.add(panel);
+    } else {
+      this.slab = box(0.12, dh, dw, M.steel, -0.06, 0, -dw / 2, this.slabGroup);
+    }
+
     this.lamp = box(0.14, 0.14, 0.3, new THREE.MeshBasicMaterial({ color: 0x802318 }), -0.07, dh + 0.16, -0.15, g);
     this.light = new THREE.PointLight(0xff4a32, 0.5, 5, 2); this.light.position.set(0, dh + 0.16, 0); g.add(this.light);
     this.dh = dh; this.dw = dw; this.y = y;
@@ -508,8 +540,8 @@ class Door {
     return { x: this.o.x - 0.15, y: this.y, z: this.o.z - this.dw / 2, w: 0.3, h: this.dh, d: this.dw * k, __door: true };
   }
   render() {
-    this.slab.scale.z = Math.max(0.001, this.dw * (1 - this.open));
-    this.slab.position.z = -this.dw / 2 + (this.dw * (1 - this.open)) / 2;
+    const slide = this.open * this.dw;
+    this.slabGroup.position.z = slide;
     const c = this.open > 0.5 ? 0x53ff9a : 0x802318;
     this.lamp.material.color.setHex(c); this.light.color.setHex(c);
     if (!this._lightCulled) this.light.intensity = 0.4 + (this.o.timed && this.timer > 0 && this.timer < 3 ? (Math.sin(this.timer * 18) * 0.5 + 0.5) * 1.1 : 0.3);
@@ -585,26 +617,55 @@ class Laser {
   constructor(o) {
     this.o = o; this.active = true;
     const g = new THREE.Group(); World.root.add(g); this.g = g;
-    const len = Math.hypot(o.x2 - o.x1, o.z2 - o.z1);
-    const ang = Math.atan2(o.x2 - o.x1, o.z2 - o.z1);
-    g.position.set(o.x1, 0.9, o.z1); g.rotation.y = ang;
-    this.beam = box(0.08, 0.08, len, new THREE.MeshBasicMaterial({ color: 0xff6a4a }), -0.04, -0.04, 0, g);
-    this.halo = box(0.4, 0.4, len, new THREE.MeshBasicMaterial({ color: 0xff2d12, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false }), -0.2, -0.2, 0, g);
-    this.light = new THREE.PointLight(0xff4a32, 1.0, 7, 2); this.light.position.set(0, 0, len / 2); g.add(this.light);
-    this.line = { x1: o.x1, z1: o.z1, x2: o.x2, z2: o.z2, y: 0.9 };
+    const dx = o.x2 - o.x1, dz = o.z2 - o.z1;
+    const len = Math.hypot(dx, dz);
+    const ang = Math.atan2(dx, dz);
+    const beamY = 0.7;
+    g.position.set(o.x1, 0, o.z1); g.rotation.y = ang;
+
+    const emitterMat = M.steelDark;
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+    box(0.18, 0.5, 0.18, emitterMat, -0.09, beamY - 0.15, -0.15, g);
+    box(0.06, 0.06, 0.06, lensMat, -0.03, beamY - 0.03, 0.03, g);
+    box(0.18, 0.5, 0.18, emitterMat, -0.09, beamY - 0.15, len - 0.03, g);
+    box(0.06, 0.06, 0.06, lensMat, -0.03, beamY - 0.03, len - 0.09, g);
+
+    const beamGeo = new THREE.CylinderBufferGeometry(0.012, 0.012, len, 4, 1);
+    beamGeo.rotateX(Math.PI / 2);
+    beamGeo.translate(0, 0, len / 2);
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0xff1100 });
+    this.beam = new THREE.Mesh(beamGeo, beamMat);
+    this.beam.position.y = beamY;
+    g.add(this.beam);
+
+    const glowGeo = new THREE.CylinderBufferGeometry(0.06, 0.06, len, 6, 1);
+    glowGeo.rotateX(Math.PI / 2);
+    glowGeo.translate(0, 0, len / 2);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.glow = new THREE.Mesh(glowGeo, glowMat);
+    this.glow.position.y = beamY;
+    g.add(this.glow);
+
+    this.light = new THREE.PointLight(0xff3311, 0.6, 5, 2); this.light.position.set(0, beamY, len / 2); g.add(this.light);
+    this.line = { x1: o.x1, z1: o.z1, x2: o.x2, z2: o.z2, y: beamY };
+    this.ph = Math.random() * 6.28;
   }
   logic() { this.active = !World.sig[this.o.off]; }
   kills() {
     if (!this.active) return null;
-    const l = this.line, x0 = Math.min(l.x1, l.x2) - 0.3, x1 = Math.max(l.x1, l.x2) + 0.3;
-    const z0 = Math.min(l.z1, l.z2) - 0.3, z1 = Math.max(l.z1, l.z2) + 0.3;
-    return { x: x0, y: l.y - 0.5, z: z0, w: x1 - x0, h: 1.0, d: z1 - z0 };
+    const l = this.line, x0 = Math.min(l.x1, l.x2) - 0.2, x1 = Math.max(l.x1, l.x2) + 0.2;
+    const z0 = Math.min(l.z1, l.z2) - 0.2, z1 = Math.max(l.z1, l.z2) + 0.2;
+    return { x: x0, y: l.y - 0.4, z: z0, w: x1 - x0, h: 0.8, d: z1 - z0 };
   }
   render(dt) {
-    this.beam.visible = this.halo.visible = this.active;
-    const flick = 0.85 + Math.random() * 0.3;
-    this.beam.scale.set(flick, flick, 1); this.halo.scale.set(flick, flick, 1);
-    if (!this._lightCulled) this.light.intensity = damp(this.light.intensity, this.active ? 1.0 : 0, 8, dt);
+    this.ph += dt;
+    this.beam.visible = this.glow.visible = this.active;
+    if (this.active) {
+      const flicker = 0.9 + Math.sin(this.ph * 30) * 0.1;
+      this.glow.material.opacity = 0.12 + Math.sin(this.ph * 15) * 0.06;
+      this.beam.scale.set(flicker, flicker, 1);
+    }
+    if (!this._lightCulled) this.light.intensity = damp(this.light.intensity, this.active ? 0.6 : 0, 8, dt);
   }
 }
 
@@ -704,7 +765,7 @@ function addEntity(o) {
   else if (o.t === 'button') e = new Button(o);
   else if (o.t === 'door') {
     e = new Door(o);
-    sealDoorway(o.x, o.z, o.w || 1.3, o.y || 0, FACILITY.ceil, FACILITY.z0, FACILITY.z1);
+    sealDoorway(o.x, o.z, o.w || 2.4, o.y || 0, FACILITY.ceil, FACILITY.z0, FACILITY.z1);
   }
   else if (o.t === 'crusher') e = new Crusher(o);
   else if (o.t === 'elevator') e = new Elevator(o);
@@ -749,13 +810,13 @@ function buildFacility() {
 
   const objects = [
     { t: 'plate', id: 'p1', x: 8, z: 3, w: 2.4 },
-    { t: 'door', id: 'd1', x: 13, z: 3, w: 1.3, req: ['p1'] },
+    { t: 'door', id: 'd1', x: 13, z: 3, w: 2.4, req: ['p1'] },
     { t: 'keepsake', x: 4, z: -3, item: 'watch', timer: 3, text: 'Your watch.<br><span style="opacity:.55">It stopped at 09:41 and never started again.</span>' },
     { t: 'keepsake', x: 14, z: 3, item: 'badge', timer: 5, text: 'A badge, still warm.<br><span style="opacity:.55">The photograph on it is yours.</span>' },
 
     { t: 'plate', id: 'pA', x: 20, z: 2, w: 2.4 },
     { t: 'plate', id: 'pB', x: 23, y: 0.84, z: 10, w: 1.8 },
-    { t: 'door', id: 'd2', x: 28, z: 6, w: 1.3, req: ['pA', 'pB'] },
+    { t: 'door', id: 'd2', x: 28, z: 6, w: 2.4, req: ['pA', 'pB'] },
     { t: 'plate', id: 'pC', x: 24, z: 15, w: 2.0 },
     { t: 'laser', x1: 26.5, z1: 2, x2: 26.5, z2: 14, off: 'pC' },
     { t: 'keepsake', x: 18, z: 13, item: 'photo', timer: 3, text: 'A photograph, face down.<br><span style="opacity:.55">You do not turn it over. You already know.</span>' },
@@ -765,23 +826,23 @@ function buildFacility() {
 
     { t: 'crusher', x: 36, z: 8, w: 3.4, d: 3.4, pitY: -0.42, top: 2.6, period: 5.0, phase: 0.28 },
     { t: 'plate', id: 'pPress', x: 36, y: -0.42, z: 8, w: 2.6 },
-    { t: 'door', id: 'd3', x: 40, z: 8, w: 1.3, req: ['pPress'] },
+    { t: 'door', id: 'd3', x: 40, z: 8, w: 2.4, req: ['pPress'] },
     { t: 'ability', x: 38, z: 13, ability: 'anchor', text: 'ANCHOR — <span style="opacity:.55">Hold Q as you die to leave a Shadow that never disappears</span>' },
     { t: 'plate', id: 'pHold', x: 42, z: 8, w: 2.2 },
-    { t: 'door', id: 'd4', x: 43.5, z: 8, w: 1.3, req: ['pHold'] },
+    { t: 'door', id: 'd4', x: 43.5, z: 8, w: 2.4, req: ['pHold'] },
     { t: 'keepsake', x: 34, z: 13, item: 'letter', timer: 3, text: 'A letter you never posted.<br><span style="opacity:.55">The handwriting is steadier than you remember.</span>' },
     { t: 'keepsake', x: 41, z: 8, item: 'circuit', timer: 5, text: 'A circuit board, scorched at one corner.<br><span style="opacity:.55">It still conducts.</span>' },
 
     { t: 'button', id: 'pwr', x: 47, z: 2, mode: 'latch' },
     { t: 'plate', id: 'pGate', x: 48, z: 6, w: 2.4 },
-    { t: 'door', id: 'g1', x: 50, z: 6, w: 1.3, req: ['pGate'] },
+    { t: 'door', id: 'g1', x: 50, z: 6, w: 2.4, req: ['pGate'] },
     { t: 'elevator', id: 'lift', x: 50, z: 9, w: 3.0, d: 2.6, top: 2.4, req: 'pwr' },
     { t: 'plate', id: 'pLaser', x: 50, y: 2.4, z: 10, w: 2.2 },
     { t: 'laser', x1: 52, z1: 4, x2: 52, z2: 14, off: 'pLaser' },
     { t: 'button', id: 'bDoor', x: 48, z: 14, mode: 'pulse' },
-    { t: 'door', id: 'g2', x: 52, z: 12, w: 1.3, req: ['bDoor'], timed: 9 },
+    { t: 'door', id: 'g2', x: 52, z: 12, w: 2.4, req: ['bDoor'], timed: 9 },
     { t: 'plate', id: 'pFinal', x: 54, z: 14, w: 2.4 },
-    { t: 'door', id: 'g3', x: 55, z: 14, w: 1.3, req: ['pFinal'] },
+    { t: 'door', id: 'g3', x: 55, z: 14, w: 2.4, req: ['pFinal'] },
     { t: 'keepsake', x: 55, z: 12, item: 'drawing', timer: 3, text: 'A drawing, in crayon.<br><span style="opacity:.55">Two figures. One of them is much taller.</span>' },
   ];
   for (const o of objects) addEntity(o);
@@ -1071,12 +1132,6 @@ function commitDeath() {
   G.state = 'play';
 }
 
-function currentDoors() {
-  const out = [];
-  for (const e of World.ents) if (e instanceof Door) { const s = e.solid(); if (s) out.push(s); }
-  return out;
-}
-
 function isPlayerOnDeck() {
   if (!G.player) return false;
   return G.player.x > 48 && G.player.x < 54 && G.player.z > 8 && G.player.z < 14 && G.player.y > 1.5;
@@ -1112,10 +1167,15 @@ function hazardKill(actor, kz) {
   return false;
 }
 
+const _doorBuf = []; const _actorBuf = [];
 function stepSim(dt) {
   G.tick++;
-  const doors = currentDoors();
-  const allActors = [G.player, ...G.shadows.filter(s => s.alive)];
+  _doorBuf.length = 0;
+  for (let i = 0, n = World.ents.length; i < n; i++) { const e = World.ents[i]; if (e instanceof Door) { const s = e.solid(); if (s) _doorBuf.push(s); } }
+  const doors = _doorBuf;
+  _actorBuf.length = 0; _actorBuf.push(G.player);
+  for (let i = 0, n = G.shadows.length; i < n; i++) if (G.shadows[i].alive) _actorBuf.push(G.shadows[i]);
+  const allActors = _actorBuf;
 
   const input = {
     left: held.left(), right: held.right(), up: held.up(), down: held.down(),
