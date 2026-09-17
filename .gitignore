@@ -1,0 +1,16 @@
+# Old scrapped side-view build, kept locally for reference only
+archive/
+
+# Raw downloaded asset kits (~150MB) — only a small curated subset of each
+# was ever converted/copied into assets/props, assets/structure, assets/lab,
+# assets/scifi, which ARE tracked; the rest is source material, not used by
+# the game directly.
+assets/kenney_conveyor-kit/
+assets/kenney_factory-kit_3.0 (1)/
+assets/lab_assets/
+assets/modular_industrial_pieces/
+assets/Modular SciFi MegaKit\[Standard\]/
+assets/ultimate_modular_sci-fi_-_feb_2021/
+
+# Auto-backups the level builder writes before every save
+levels.json.bak.*
