@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>SHADOW</title>
+<style>
+  :root{ --ink:#dbdfd6; --dim:#868d84; --purple:#8a6dff; --purple-glow:#bca6ff; --warn:#d2993b; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0d1117;overflow:hidden;
+    font-family:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;color:var(--ink)}
+  canvas{display:block;position:fixed;inset:0}
+
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;transition:background .4s linear;
+    background:radial-gradient(ellipse 82% 74% at 50% 52%, rgba(0,0,0,0) 40%, rgba(0,0,0,.5) 82%, rgba(0,0,0,.86) 100%)}
+  #vignette.alarm{animation:alarmPulse .62s ease-in-out infinite}
+  @keyframes alarmPulse{
+    0%,100%{background:radial-gradient(ellipse 74% 64% at 50% 52%, rgba(0,0,0,0) 28%, rgba(60,0,0,.46) 70%, rgba(0,0,0,.9) 100%)}
+    50%{background:radial-gradient(ellipse 64% 56% at 50% 52%, rgba(0,0,0,0) 18%, rgba(120,8,0,.58) 62%, rgba(0,0,0,.94) 100%)}
+  }
+  #grain{position:fixed;inset:-50%;pointer-events:none;z-index:6;opacity:.04;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
+    animation:grain 1.1s steps(4) infinite}
+  @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-2%)}100%{transform:translate(3%,1%)}}
+  #flash{position:fixed;inset:0;pointer-events:none;z-index:9;background:#fff;opacity:0}
+  #fade{position:fixed;inset:0;pointer-events:none;z-index:12;background:#000;opacity:1;transition:opacity 1s linear}
+
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:8;
+    padding:calc(18px + env(safe-area-inset-top,0px)) 24px calc(18px + env(safe-area-inset-bottom,0px))}
+  .row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .lbl{font-size:10px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
+  #time{font-size:30px;font-weight:200;letter-spacing:.1em;font-variant-numeric:tabular-nums;line-height:1}
+  #time.low{color:var(--warn)}
+  #time.crit{animation:pulse .5s ease-in-out infinite}
+  #bonus{position:absolute;left:96px;top:34px;font-size:22px;font-weight:300;letter-spacing:.06em;
+    color:#a8ecff;opacity:0;pointer-events:none}
+  #bonus.on{animation:bonusPop 1.1s ease-out}
+  @keyframes bonusPop{0%{opacity:0;transform:translateY(6px)}18%{opacity:1;transform:translateY(-2px)}
+    100%{opacity:0;transform:translateY(-22px)}}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.06)}}
+  #right{text-align:right}
+  #shadowcount{font-size:15px;font-weight:300;letter-spacing:.18em;color:var(--purple)}
+  #attempt{font-size:10px;letter-spacing:.28em;color:var(--dim);margin-top:6px}
+  #speed{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));
+    font-size:11px;letter-spacing:.3em;color:var(--dim);z-index:8;pointer-events:none;opacity:0;transition:opacity .25s}
+  #speed.on{opacity:1;color:var(--purple)}
+  #devmode{position:fixed;left:50%;top:8px;transform:translateX(-50%);
+    font-size:11px;letter-spacing:.2em;color:#ffb347;z-index:8;pointer-events:none;opacity:0;transition:opacity .25s;
+    background:rgba(20,14,4,.6);padding:4px 12px;border-radius:4px;border:1px solid rgba(255,179,71,.4)}
+  #devmode.on{opacity:1}
+  #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(56px + env(safe-area-inset-bottom,0px));
+    font-size:12px;letter-spacing:.14em;color:var(--dim);z-index:8;pointer-events:none;opacity:0;transition:opacity .6s;text-align:center;max-width:min(560px,86vw)}
+  #hint.on{opacity:.9}
+
+  #roomcard{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:10;pointer-events:none;opacity:0;transition:opacity .9s}
+  #roomcard.on{opacity:1}
+  #roomcard .n{font-size:11px;letter-spacing:.5em;color:var(--dim)}
+  #roomcard .t{font-size:clamp(28px,6vw,54px);font-weight:200;letter-spacing:.24em;margin-top:10px}
+  #roomcard .s{font-size:12px;letter-spacing:.2em;color:var(--dim);margin-top:14px;font-style:italic}
+
+  #frag{position:fixed;left:50%;bottom:16%;transform:translateX(-50%);z-index:9;pointer-events:none;
+    max-width:min(620px,84vw);text-align:center;font-size:14px;line-height:1.85;letter-spacing:.06em;
+    color:#c8d2d7;opacity:0;transition:opacity .8s;text-shadow:0 2px 18px #000}
+  #frag.on{opacity:1}
+  #keepsake{position:fixed;left:50%;bottom:26%;transform:translateX(-50%);z-index:9;pointer-events:none;
+    max-width:min(560px,84vw);text-align:center;font-size:15px;line-height:1.8;letter-spacing:.05em;
+    color:#ffd7ab;opacity:0;transition:opacity .7s;text-shadow:0 2px 20px #000}
+  #keepsake.on{opacity:1}
+  #anchor{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:9;pointer-events:none;
+    font-size:13px;letter-spacing:.32em;text-transform:uppercase;color:#a97bff;opacity:0;transition:opacity .25s;
+    text-shadow:0 0 12px rgba(169,123,255,.7)}
+  #anchor.on{opacity:1}
+
+  .screen{position:fixed;inset:0;z-index:11;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(5,7,9,.9);backdrop-filter:blur(6px);text-align:center;padding:24px}
+  .screen.on{display:flex}
+  .screen h1{font-size:clamp(44px,13vw,120px);font-weight:100;letter-spacing:.42em;margin:0 0 6px 14px}
+  .screen h2{font-size:clamp(20px,5vw,34px);font-weight:200;letter-spacing:.3em;margin:0 0 22px}
+  .screen p{color:var(--dim);font-size:13px;letter-spacing:.12em;line-height:2;margin:4px 0;max-width:min(620px,88vw)}
+  .keys{margin-top:26px;display:grid;grid-template-columns:auto auto;gap:8px 22px;font-size:12px;letter-spacing:.1em}
+  .keys b{font-weight:500;color:var(--ink);text-align:right}
+  .keys span{color:var(--dim);text-align:left}
+  .cta{margin-top:34px;font-size:12px;letter-spacing:.34em;color:var(--purple);animation:pulse 2.4s ease-in-out infinite}
+
+  #ending{position:fixed;inset:0;z-index:13;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:#000;text-align:center;padding:24px}
+  #ending.on{display:flex}
+  #ending .line{font-size:clamp(14px,3.2vw,20px);font-weight:200;letter-spacing:.26em;line-height:2.2;
+    opacity:0;transition:opacity 2s;max-width:min(760px,90vw)}
+  #ending .line.on{opacity:1}
+  #ending .title{font-size:clamp(46px,14vw,130px);font-weight:100;letter-spacing:.46em;margin-left:22px;
+    opacity:0;transition:opacity 3s}
+  #ending .title.on{opacity:1}
+  #loading{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#05070a;
+    font-size:11px;letter-spacing:.5em;color:#4b565c}
+</style>
+</head>
+<body>
+<div id="vignette"></div><div id="grain"></div><div id="flash"></div><div id="fade"></div>
+
+<div id="dbg" style="position:fixed;left:14px;bottom:14px;z-index:9;display:none;font:11px/1.5 monospace;color:#7fe0a0;white-space:pre;pointer-events:none;background:rgba(0,0,0,.55);padding:8px 10px"></div>
+<div id="hud" hidden>
+  <div class="row">
+    <div><div class="lbl">Time</div><div id="time">00:00</div><div id="bonus"></div></div>
+    <div id="right"><div class="lbl">Shadows</div><div id="shadowcount">&times; 0</div><div id="attempt">Attempt 1</div></div>
+  </div>
+</div>
+<div id="speed">FAST FORWARD &times;2</div>
+<div id="devmode">DEV MODE &mdash; no timer, no death &mdash; 1&ndash;9 room, 0 hub</div>
+<div id="hint"></div>
+<div id="frag"></div>
+<div id="keepsake"></div>
+<div id="anchor">ANCHORED</div>
+
+<div id="roomcard"><div class="n"></div><div class="t"></div><div class="s"></div></div>
+
+<div class="screen on" id="menu">
+  <h1>SHADOW</h1>
+  <h2 style="opacity:.55;font-size:12px;letter-spacing:.44em;margin-top:2px">YOU HAVE BEEN HERE BEFORE</h2>
+  <p>Every time you die, what you did comes back<br>and does it again. Exactly as you did it.</p>
+  <p style="opacity:.7">You will not get out of these rooms alone.</p>
+  <div class="keys">
+    <b>W A S D</b><span>move</span>
+    <b>E</b><span>interact &mdash; levers and buttons</span>
+    <b>R</b><span>die &amp; leave a Shadow</span>
+    <b>Q</b><span>anchor &mdash; hold as you die to leave a Shadow that never disappears</span>
+    <b>1 / 2 / 3</b><span>speed &times;1 &times;2 &times;4</span>
+    <b>ESC</b><span>pause</span>
+  </div>
+  <div class="cta">PRESS ANY KEY</div>
+  <p style="opacity:.4;margin-top:10px">dev: press 1&ndash;9 to jump straight into a room, skipping the hub</p>
+  <div id="build" style="margin-top:18px;font-size:10px;letter-spacing:.2em;color:#3f4a52"></div>
+</div>
+
+<div class="screen" id="pause">
+  <h2>PAUSED</h2>
+  <p><b>ESC</b> resume &nbsp;&middot;&nbsp; <b>R</b> restart attempt &nbsp;&middot;&nbsp; <b>BACKSPACE</b> restart room</p>
+  <div class="keys">
+    <b>W A S D</b><span>move</span><b>E</b><span>interact</span>
+    <b>R</b><span>die &amp; leave a Shadow</span><b>Q</b><span>anchor a Shadow permanently</span>
+    <b>1 / 2 / 3</b><span>fast forward</span>
+  </div>
+  <p style="opacity:.4;margin-top:14px">dev: press 1&ndash;9 to jump to a room, 0 for the hub &mdash; skips everything, for checking progress</p>
+</div>
+
+<div id="ending">
+  <div class="line" id="e1"></div>
+  <div class="title" id="etitle">SHADOW</div>
+</div>
+
+<div id="loading">LOADING</div>
+
+<script>
+(function(){
+  function panel(title, body){
+    var d = document.getElementById('errbox');
+    if(!d){ d = document.createElement('div'); d.id='errbox';
+      d.style.cssText='position:fixed;inset:auto 0 0 0;z-index:99;background:#1a0b0b;'+
+        'border-top:1px solid #ff6a4a;color:#ffb4a4;font:12px/1.6 monospace;'+
+        'padding:12px 16px;max-height:45vh;overflow:auto;white-space:pre-wrap';
+      document.body.appendChild(d); }
+    d.textContent += title + '\n' + body + '\n\n';
+    var l = document.getElementById('loading'); if(l) l.style.display='none';
+  }
+  window.addEventListener('error', function(e){
+    panel('ERROR  ' + (e.message||''),
+      '  at ' + ((e.filename||'').split('/').pop()) + ':' + e.lineno + ':' + e.colno +
+      (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    panel('UNHANDLED PROMISE', '  ' + (e.reason && e.reason.message || e.reason));
+  });
+  window.addEventListener('load', function(){
+    if(!window.THREE) panel('three.js did not load',
+      '  vendor/three.min.js is missing and the CDN fallback was blocked.');
+    else { try { var c=document.createElement('canvas');
+      if(!(c.getContext('webgl')||c.getContext('experimental-webgl')))
+        panel('WebGL unavailable', '  This browser/GPU cannot create a WebGL context.');
+    } catch(err){ panel('WebGL check failed','  '+err.message); } }
+  });
+})();
+</script>
+<script src="vendor/three.min.js"></script>
+<script>if(!window.THREE)document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/scr'+'ipt>');</script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

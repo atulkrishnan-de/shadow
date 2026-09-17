@@ -1,0 +1,848 @@
+{
+  "rooms": [
+    {
+      "num": "I",
+      "title": "INTAKE",
+      "sub": "you have been here before",
+      "time": 13,
+      "maxShadows": 3,
+      "spawn": {
+        "x": 0,
+        "z": 2
+      },
+      "exit": {
+        "x": 18,
+        "z": 2
+      },
+      "bounds": {
+        "x0": -2,
+        "x1": 22,
+        "z0": -7,
+        "z1": 7
+      },
+      "ceil": 8,
+      "hint": "The door needs weight on the plate. You cannot be in two places.\nLet the clock run out \u2014 what you did will still be here.",
+      "solids": [
+        [
+          7.5,
+          0,
+          -5.5,
+          1.5,
+          1.4,
+          1.5,
+          "crate"
+        ],
+        [
+          7.5,
+          0,
+          4,
+          1.6,
+          1.1,
+          1.6,
+          "rust"
+        ],
+        [
+          16,
+          0,
+          -5.5,
+          1.8,
+          1.2,
+          1.8,
+          "crate"
+        ]
+      ],
+      "objects": [
+        {
+          "t": "plate",
+          "id": "p1",
+          "x": 5,
+          "z": 2,
+          "w": 2.4
+        },
+        {
+          "t": "door",
+          "id": "d1",
+          "x": 11.5,
+          "z": 2,
+          "w": 1.3,
+          "req": [
+            "p1"
+          ]
+        },
+        {
+          "t": "keepsake",
+          "x": 15,
+          "z": -3.4,
+          "item": "watch",
+          "text": "Your watch.<br><span style=\"opacity:.55\">It stopped at 09:41 and never started again.</span>"
+        }
+      ],
+      "frags": [
+        {
+          "x": 2.5,
+          "z": 2,
+          "text": "SECTOR C &middot; MAINTENANCE INTAKE<br><span style=\"opacity:.55\">authorised personnel only</span>"
+        },
+        {
+          "x": 8,
+          "z": 0.5,
+          "text": "You know which corridors are load-bearing.<br><span style=\"opacity:.55\">You have never been inside this building.</span>"
+        },
+        {
+          "x": 12,
+          "z": -3,
+          "text": "Fourteen years without maintenance. The lights are still on."
+        },
+        {
+          "x": 16,
+          "z": 1.5,
+          "text": "Nothing in here has decayed the way it should have."
+        },
+        {
+          "x": 19,
+          "z": 2,
+          "text": "The badge reader has not asked for a badge in fourteen years.<br><span style=\"opacity:.55\">It still knows you regardless.</span>"
+        }
+      ],
+      "lamps": [
+        [
+          2,
+          6.4,
+          0,
+          1
+        ],
+        [
+          7,
+          6.4,
+          3,
+          0
+        ],
+        [
+          12,
+          6.4,
+          -3,
+          1
+        ],
+        [
+          17,
+          6.4,
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "num": "II",
+      "title": "SORTING",
+      "sub": "your name is already on the list",
+      "time": 15,
+      "maxShadows": 4,
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "exit": {
+        "x": 22,
+        "z": 5
+      },
+      "bounds": {
+        "x0": -2,
+        "x1": 24,
+        "z0": -2,
+        "z1": 15
+      },
+      "ceil": 10,
+      "hint": "Two plates. One of you. Build the team out of your failures.\nOne more plate further on. One more of you.",
+      "solids": [
+        [
+          8,
+          0,
+          8,
+          3,
+          0.4,
+          3,
+          "step"
+        ],
+        [
+          8.6,
+          0.4,
+          8.6,
+          1.8,
+          0.4,
+          1.8,
+          "step"
+        ],
+        [
+          14,
+          0,
+          3,
+          1.6,
+          1.3,
+          1.6,
+          "rust"
+        ],
+        [
+          3,
+          0,
+          12,
+          1.8,
+          1.1,
+          1.8,
+          "crate"
+        ],
+        [
+          18,
+          0,
+          9,
+          0.5,
+          3.2,
+          3,
+          "steelDark"
+        ]
+      ],
+      "objects": [
+        {
+          "t": "plate",
+          "id": "pA",
+          "x": 4,
+          "z": 0,
+          "w": 2.4
+        },
+        {
+          "t": "plate",
+          "id": "pB",
+          "x": 8.6,
+          "y": 0.8,
+          "z": 8.6,
+          "w": 1.6
+        },
+        {
+          "t": "door",
+          "id": "d1",
+          "x": 12.5,
+          "z": 5,
+          "w": 1.3,
+          "req": [
+            "pA",
+            "pB"
+          ]
+        },
+        {
+          "t": "plate",
+          "id": "pC",
+          "x": 16.5,
+          "z": 13,
+          "w": 2
+        },
+        {
+          "t": "laser",
+          "x1": 20,
+          "z1": 13,
+          "x2": 20,
+          "z2": 5,
+          "off": "pC"
+        },
+        {
+          "t": "door",
+          "id": "d2",
+          "x": 21.3,
+          "z": 5,
+          "w": 1.3,
+          "req": [
+            "pC"
+          ]
+        },
+        {
+          "t": "keepsake",
+          "x": 4,
+          "z": 12.5,
+          "item": "photo",
+          "text": "A photograph, face down.<br><span style=\"opacity:.55\">You do not turn it over. You already know.</span>"
+        },
+        {
+          "t": "keepsake",
+          "x": 15,
+          "z": 1,
+          "item": "key",
+          "text": "A house key, worn smooth.<br><span style=\"opacity:.55\">There is still a house.</span>"
+        }
+      ],
+      "frags": [
+        {
+          "x": 3,
+          "z": 0,
+          "text": "Every door in this building asks for someone who is not here."
+        },
+        {
+          "x": 6,
+          "z": 13,
+          "text": "SORTING BAY 2 &mdash; <span style=\"opacity:.55\">personal effects, unclaimed</span>"
+        },
+        {
+          "x": 10,
+          "z": 5,
+          "text": "A badge in the tray. Your photograph.<br><span style=\"opacity:.55\">The name is yours. The date is not.</span>"
+        },
+        {
+          "x": 18,
+          "z": 10,
+          "text": "Two was never going to be enough."
+        },
+        {
+          "x": 21,
+          "z": 5,
+          "text": "Whatever happened here, it happened to someone who signed in."
+        }
+      ],
+      "lamps": [
+        [
+          2,
+          8.4,
+          0,
+          1
+        ],
+        [
+          8,
+          8.4,
+          8,
+          1
+        ],
+        [
+          14,
+          8.4,
+          4,
+          0
+        ],
+        [
+          18,
+          8.4,
+          11,
+          1
+        ],
+        [
+          21,
+          8.4,
+          5,
+          1
+        ]
+      ]
+    },
+    {
+      "num": "III",
+      "title": "PRESS ROOM",
+      "sub": "the iterations are not free",
+      "time": 15,
+      "maxShadows": 4,
+      "spawn": {
+        "x": 0,
+        "z": 2
+      },
+      "exit": {
+        "x": 20,
+        "z": 8
+      },
+      "bounds": {
+        "x0": -2,
+        "x1": 22,
+        "z0": -2,
+        "z1": 14
+      },
+      "ceil": 9,
+      "hint": "The plate is under the press. Whatever holds it does not come back.\nOne door needs something that never lets go &mdash; hold Q as you die.",
+      "solids": [
+        [
+          6,
+          0,
+          5.4,
+          0.6,
+          0.42,
+          5.2,
+          "step"
+        ],
+        [
+          11.4,
+          0,
+          5.4,
+          0.6,
+          0.42,
+          5.2,
+          "step"
+        ],
+        [
+          16,
+          0,
+          10,
+          1.8,
+          1.3,
+          1.8,
+          "rust"
+        ]
+      ],
+      "objects": [
+        {
+          "t": "plate",
+          "id": "p1",
+          "x": 8,
+          "y": -0.42,
+          "z": 8,
+          "w": 2.6
+        },
+        {
+          "t": "crusher",
+          "x": 6.8,
+          "z": 6.4,
+          "w": 3.4,
+          "d": 3.4,
+          "pitY": -0.42,
+          "top": 6.5,
+          "period": 5,
+          "phase": 0.28
+        },
+        {
+          "t": "door",
+          "id": "d1",
+          "x": 13.5,
+          "z": 8,
+          "w": 1.3,
+          "req": [
+            "p1"
+          ]
+        },
+        {
+          "t": "keepsake",
+          "x": 15,
+          "z": 10.5,
+          "item": "letter",
+          "text": "A letter you never posted.<br><span style=\"opacity:.55\">The handwriting is steadier than you remember.</span>"
+        },
+        {
+          "t": "plate",
+          "id": "p2",
+          "x": 17.5,
+          "z": 8,
+          "w": 2.2
+        },
+        {
+          "t": "door",
+          "id": "d2",
+          "x": 19.3,
+          "z": 8,
+          "w": 1.3,
+          "req": [
+            "p2"
+          ]
+        }
+      ],
+      "frags": [
+        {
+          "x": 3,
+          "z": 2,
+          "text": "HYDRAULIC PRESS 3 &mdash; <span style=\"opacity:.55\">interlock disabled for containment test 04/11</span>"
+        },
+        {
+          "x": 8,
+          "z": 2.5,
+          "text": "Your pack is already down there.<br><span style=\"opacity:.55\">You are still wearing yours.</span>"
+        },
+        {
+          "x": 8,
+          "z": 8,
+          "text": "Whatever the press keeps, the field keeps."
+        },
+        {
+          "x": 13,
+          "z": 8,
+          "text": "It never stopped. Nobody came back to switch it off."
+        },
+        {
+          "x": 17,
+          "z": 8,
+          "text": "Whatever holds this one must never let go.<br><span style=\"opacity:.55\">Some of you cannot be allowed to finish.</span>"
+        }
+      ],
+      "lamps": [
+        [
+          2,
+          7.4,
+          2,
+          1
+        ],
+        [
+          8,
+          7.4,
+          3,
+          0
+        ],
+        [
+          13,
+          7.4,
+          8,
+          1
+        ],
+        [
+          18,
+          7.4,
+          8,
+          1
+        ]
+      ]
+    },
+    {
+      "num": "IV",
+      "title": "OBSERVATION",
+      "sub": "the door was never locked",
+      "time": 28,
+      "maxShadows": 5,
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "exit": {
+        "x": 26,
+        "z": 12
+      },
+      "bounds": {
+        "x0": -2,
+        "x1": 28,
+        "z0": -2,
+        "z1": 15
+      },
+      "ceil": 15,
+      "deckZone": {
+        "x": 10,
+        "z": 6,
+        "w": 6,
+        "d": 6
+      },
+      "hint": "Power. Gate. Beam. Door. Five things, one of you at a time.\nThe last one has to still be there when you arrive &mdash; hold Q as you die.",
+      "solids": [
+        [
+          18,
+          0,
+          4,
+          0.5,
+          7.4,
+          0.5,
+          "steelDark"
+        ]
+      ],
+      "objects": [
+        {
+          "t": "button",
+          "id": "pwr",
+          "x": 3,
+          "z": 0,
+          "mode": "latch"
+        },
+        {
+          "t": "plate",
+          "id": "pGate",
+          "x": 6,
+          "z": 0,
+          "w": 2.6
+        },
+        {
+          "t": "door",
+          "id": "g1",
+          "x": 9,
+          "z": 0,
+          "w": 1.3,
+          "req": [
+            "pGate"
+          ]
+        },
+        {
+          "t": "elevator",
+          "id": "lift",
+          "x": 11,
+          "z": 2,
+          "w": 3.2,
+          "d": 2.8,
+          "top": 8,
+          "req": "pwr"
+        },
+        {
+          "t": "plate",
+          "id": "pLaser",
+          "x": 12,
+          "y": 8,
+          "z": 8,
+          "w": 2.6,
+          "onDeck": true
+        },
+        {
+          "t": "laser",
+          "x1": 14,
+          "z1": 2,
+          "x2": 14,
+          "z2": 14,
+          "off": "pLaser"
+        },
+        {
+          "t": "button",
+          "id": "bDoor",
+          "x": 16,
+          "z": 0,
+          "mode": "pulse"
+        },
+        {
+          "t": "door",
+          "id": "g2",
+          "x": 20,
+          "z": 8,
+          "w": 1.3,
+          "req": [
+            "bDoor"
+          ],
+          "timed": 11
+        },
+        {
+          "t": "plate",
+          "id": "pFinal",
+          "x": 23,
+          "z": 12,
+          "w": 2.4
+        },
+        {
+          "t": "door",
+          "id": "g3",
+          "x": 24.7,
+          "z": 12,
+          "w": 1.3,
+          "req": [
+            "pFinal"
+          ]
+        },
+        {
+          "t": "keepsake",
+          "x": 26,
+          "z": 12,
+          "item": "drawing",
+          "text": "A drawing, in crayon.<br><span style=\"opacity:.55\">Two figures. One of them is much taller.</span>"
+        }
+      ],
+      "frags": [
+        {
+          "x": 3,
+          "z": -1.4,
+          "text": "MAIN BUS &mdash; <span style=\"opacity:.55\">containment floor / observation deck</span>"
+        },
+        {
+          "x": 11,
+          "z": 4,
+          "text": "The lift still smells of the day it failed."
+        },
+        {
+          "x": 12,
+          "z": 8,
+          "deck": true,
+          "text": "This is where they watched from.<br><span style=\"opacity:.55\">You have only ever seen it from the other side.</span>"
+        },
+        {
+          "x": 14,
+          "z": 2,
+          "text": "SITE SURVEY 1961<br><span style=\"opacity:.55\">anomalous interval recorded, sub-level 2</span>"
+        },
+        {
+          "x": 22,
+          "z": 12,
+          "text": "The field has held for fourteen years.<br><span style=\"opacity:.55\">It has only ever needed the one subject.</span>"
+        },
+        {
+          "x": 25,
+          "z": 12,
+          "text": "The door at the end has never been locked."
+        }
+      ],
+      "lamps": [
+        [
+          2,
+          7.4,
+          0,
+          1
+        ],
+        [
+          10,
+          7.4,
+          4,
+          1
+        ],
+        [
+          18,
+          7.4,
+          4,
+          1
+        ],
+        [
+          24,
+          7.4,
+          12,
+          1
+        ]
+      ]
+    }
+  ],
+  "hub": {
+    "bounds": {
+      "x0": -25,
+      "x1": 25,
+      "z0": -10.5,
+      "z1": 10.5
+    },
+    "ceil": 11,
+    "spawn": {
+      "x": -0.5,
+      "z": 1
+    },
+    "floors": [
+      {
+        "y": 4.6,
+        "bounds": {
+          "x0": -24.97,
+          "x1": -7.87,
+          "z0": -10.5,
+          "z1": -7
+        }
+      },
+      {
+        "y": 4.6,
+        "bounds": {
+          "x0": -6.87,
+          "x1": 24.98,
+          "z0": -10.5,
+          "z1": -7
+        }
+      },
+      {
+        "y": 4.6,
+        "bounds": {
+          "x0": -24.87,
+          "x1": 25.03,
+          "z0": 6.88,
+          "z1": 10.38
+        }
+      }
+    ],
+    "stairs": [
+      {
+        "x0": -25,
+        "z0": -7,
+        "w": 2.6,
+        "steps": 11,
+        "rise": 0.44,
+        "run": 1.05,
+        "fromY": 0
+      },
+      {
+        "x0": -25,
+        "z0": 5.5,
+        "w": 2.6,
+        "steps": 11,
+        "rise": 0.44,
+        "run": 1.05,
+        "fromY": 0
+      },
+      {
+        "x0": 12,
+        "z0": -7,
+        "w": 2.6,
+        "steps": 11,
+        "rise": 0.44,
+        "run": 1.05,
+        "fromY": 0,
+        "flip": true
+      },
+      {
+        "x0": 12,
+        "z0": 5.5,
+        "w": 2.6,
+        "steps": 11,
+        "rise": 0.44,
+        "run": 1.05,
+        "fromY": 0,
+        "flip": true
+      }
+    ],
+    "doors": [
+      {
+        "need": null,
+        "x": -9,
+        "y": 4.6,
+        "z": 10.05,
+        "w": 1.7,
+        "to": 0
+      },
+      {
+        "need": [
+          "k0"
+        ],
+        "x": 5.5,
+        "y": 4.6,
+        "z": 10.05,
+        "w": 1.7,
+        "to": 1
+      },
+      {
+        "need": [
+          "k0",
+          "k1"
+        ],
+        "x": -11,
+        "y": 4.6,
+        "z": -9.95,
+        "w": 1.7,
+        "to": 2
+      },
+      {
+        "need": [
+          "k0",
+          "k1",
+          "k2"
+        ],
+        "x": 6.25,
+        "y": 4.6,
+        "z": -9.95,
+        "w": 1.7,
+        "to": 3
+      }
+    ],
+    "lamps": [
+      [
+        0,
+        9,
+        -0.5,
+        1
+      ],
+      [
+        4,
+        9,
+        3,
+        1
+      ],
+      [
+        7,
+        9,
+        -0.5,
+        1
+      ],
+      [
+        10,
+        9,
+        3,
+        1
+      ],
+      [
+        7,
+        9,
+        -0.5,
+        1
+      ],
+      [
+        16,
+        9,
+        6.63,
+        1
+      ]
+    ]
+  }
+}

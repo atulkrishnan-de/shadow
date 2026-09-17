@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SHADOW — Level Builder</title>
+<style>
+  :root{ --ink:#e6ecef; --dim:#8b979e; --purple:#a97bff; --bg:#0b0d10; --panel:#12151a; --line:#232a30; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 "Inter",Helvetica,Arial,sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #topbar h1{font-size:13px;font-weight:600;letter-spacing:.1em;margin:0 12px 0 0;color:var(--purple)}
+  .tabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+  .tab{padding:5px 10px;border-radius:4px;background:#1a1e24;color:var(--dim);cursor:pointer;border:1px solid transparent;font-size:12px;white-space:nowrap}
+  .tab.active{background:#242a33;color:var(--ink);border-color:var(--purple)}
+  button, .btn{background:#1a1e24;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer;font-size:12px}
+  button:hover, .btn:hover{border-color:var(--purple)}
+  button.primary{background:var(--purple);color:#111;border-color:var(--purple);font-weight:600}
+  #status{font-size:11px;color:var(--dim);min-width:160px;text-align:right}
+  #main{flex:1;display:flex;min-height:0}
+  #toolbar{width:150px;background:var(--panel);border-right:1px solid var(--line);padding:10px;overflow-y:auto}
+  #toolbar h3{font-size:10px;letter-spacing:.15em;color:var(--dim);margin:14px 0 6px;text-transform:uppercase}
+  #toolbar h3:first-child{margin-top:0}
+  .tool{display:block;width:100%;text-align:left;margin-bottom:4px}
+  .tool.active{background:var(--purple);color:#111;border-color:var(--purple)}
+  #canvasWrap{flex:1;position:relative;overflow:auto;background:
+    linear-gradient(#0d1013,#0d1013);}
+  canvas{display:block;cursor:crosshair}
+  #meta{width:340px;background:var(--panel);border-left:1px solid var(--line);padding:10px;overflow-y:auto}
+  #meta h3{font-size:10px;letter-spacing:.15em;color:var(--dim);margin:14px 0 6px;text-transform:uppercase}
+  #meta h3:first-child{margin-top:0}
+  .row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+  .row label{width:70px;color:var(--dim);font-size:11px;flex-shrink:0}
+  .row input, .row select{flex:1;background:#1a1e24;border:1px solid var(--line);color:var(--ink);border-radius:3px;padding:4px 6px;font-size:12px;min-width:0}
+  textarea{width:100%;background:#1a1e24;border:1px solid var(--line);color:var(--ink);border-radius:3px;padding:6px;font:11px/1.5 monospace;resize:vertical}
+  #propsBox textarea{height:220px}
+  .hint{font-size:11px;color:var(--dim);line-height:1.6;margin:6px 0}
+  .legend{font-size:10px;color:var(--dim);line-height:1.8;margin-top:8px}
+  .legend span{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .listrow{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border:1px solid var(--line);border-radius:3px;margin-bottom:4px;cursor:pointer;font-size:11px}
+  .listrow:hover{border-color:var(--purple)}
+  .listrow.sel{border-color:var(--purple);background:#1c1420}
+  .small{font-size:10px;color:var(--dim)}
+  #err{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#3a1010;color:#ffb4a4;border:1px solid #ff6a4a;padding:8px 14px;border-radius:6px;font-size:12px;display:none;z-index:50}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <h1>SHADOW — LEVEL BUILDER</h1>
+    <div class="tabs" id="tabs"></div>
+    <button id="addRoom">+ Room</button>
+    <button id="reloadBtn">Reload</button>
+    <button id="saveBtn" class="primary">Save</button>
+    <a class="btn" href="index.html" target="_blank" style="text-decoration:none">Open Game ↗</a>
+    <div id="status">loading…</div>
+  </div>
+  <div id="main">
+    <div id="toolbar"></div>
+    <div id="canvasWrap"><canvas id="cv" width="2000" height="1400"></canvas></div>
+    <div id="meta"></div>
+  </div>
+</div>
+<div id="err"></div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), ctx = cv.getContext('2d');
+
+/* ---------------------------------------------------------------- state */
+let data = { rooms: [], hub: null };
+let activeTab = 'hub';           // 'hub' | room index (number)
+let tool = 'select';
+let selected = null;             // {kind, ref, arr, idx} describing what's picked
+let drag = null;                 // in-progress placement/drag info
+const PX = 26;                   // pixels per world unit
+let pan = { x: 0, y: 0 };
+
+function activeRoom() { return typeof activeTab === 'number' ? data.rooms[activeTab] : null; }
+function activeBounds() { const r = activeRoom(); return r ? r.bounds : data.hub.bounds; }
+
+function worldToPx(x, z) { return [pan.x + x * PX, pan.y + z * PX]; }
+function pxToWorld(px, pz) { return [(px - pan.x) / PX, (pz - pan.y) / PX]; }
+
+function showErr(msg) { const e = $('#err'); e.textContent = msg; e.style.display = 'block'; clearTimeout(showErr._t); showErr._t = setTimeout(() => e.style.display = 'none', 4000); }
+function setStatus(s) { $('#status').textContent = s; }
+
+/* ------------------------------------------------------------- defaults */
+function newRoom(n) {
+  return {
+    num: String(n + 1), title: 'ROOM ' + (n + 1), sub: 'untitled', time: 15, maxShadows: 4,
+    spawn: { x: 0, z: 0 }, exit: { x: 16, z: 0 },
+    bounds: { x0: -2, x1: 20, z0: -6, z1: 6 }, ceil: 9,
+    hint: 'Say what the room teaches here.',
+    solids: [], objects: [], frags: [], lamps: [],
+  };
+}
+const OBJECT_DEFAULTS = {
+  plate: { t: 'plate', id: 'p', x: 0, z: 0, w: 2.4 },
+  door: { t: 'door', id: 'd', x: 0, z: 0, w: 1.3, req: [] },
+  button: { t: 'button', id: 'b', x: 0, z: 0, mode: 'latch' },
+  crusher: { t: 'crusher', x: 0, z: 0, w: 3, d: 3, pitY: 0, top: 6.5, period: 5, phase: 0 },
+  elevator: { t: 'elevator', id: 'lift', x: 0, z: 0, w: 3, d: 2.8, top: 6, req: 'pwr' },
+  laser: { t: 'laser', x1: 0, z1: 0, x2: 4, z2: 0, off: 'p' },
+  keepsake: { t: 'keepsake', x: 0, z: 0, item: 'watch', text: 'A keepsake.' },
+};
+const HUB_DOOR_DEFAULT = { need: null, x: 0, y: 0, z: 0, w: 1.7, to: 0 };
+const HUB_STAIR_DEFAULT = { x0: 0, z0: 0, w: 2.6, steps: 8, rise: 0.44, run: 1.05, fromY: 0 };
+const HUB_FLOOR_DEFAULT = { y: 4.6, bounds: { x0: 0, x1: 10, z0: -8, z1: -4 } };
+
+const TYPE_COLOR = {
+  solid: '#3a4450', plate: '#3fae7d', door: '#c94a3a', button: '#c98a3a',
+  crusher: '#8a4a2a', elevator: '#3a6ac9', laser: '#ff5a3a', keepsake: '#e0b060',
+  lamp: '#5fc8ff', frag: '#8b979e', spawn: '#4fe0a0', exit: '#5fa8ff', hubdoor: '#a97bff', stair: '#7a8a95', floor: '#2c3540',
+};
+
+/* ---------------------------------------------------------- tool config */
+const ROOM_TOOLS = [
+  ['select', 'Select'], ['solid', 'Solid'], ['plate', 'Plate'], ['door', 'Door'],
+  ['button', 'Button'], ['crusher', 'Crusher'], ['elevator', 'Elevator'], ['laser', 'Laser (2 clicks)'],
+  ['keepsake', 'Keepsake'], ['lamp', 'Lamp'], ['frag', 'Fragment'], ['spawn', 'Set Spawn'], ['exit', 'Set Exit'],
+];
+const HUB_TOOLS = [
+  ['select', 'Select'], ['hubdoor', 'Room Door'], ['stair', 'Stair'], ['floor', 'Floor slab'], ['lamp', 'Lamp'],
+];
+
+function renderToolbar() {
+  const tb = $('#toolbar'); tb.innerHTML = '';
+  const tools = activeTab === 'hub' ? HUB_TOOLS : ROOM_TOOLS;
+  const h = document.createElement('h3'); h.textContent = 'Tools'; tb.appendChild(h);
+  for (const [id, label] of tools) {
+    const b = document.createElement('button');
+    b.className = 'tool' + (tool === id ? ' active' : ''); b.textContent = label;
+    b.onclick = () => { tool = id; drag = null; renderToolbar(); };
+    tb.appendChild(b);
+  }
+  const leg = document.createElement('div'); leg.className = 'legend';
+  leg.innerHTML = Object.entries(TYPE_COLOR).map(([k, c]) => `<div><span style="background:${c}"></span>${k}</div>`).join('');
+  tb.appendChild(document.createElement('h3')).textContent = 'Legend';
+  tb.appendChild(leg);
+}
+
+/* --------------------------------------------------------------- tabs */
+function renderTabs() {
+  const t = $('#tabs'); t.innerHTML = '';
+  const hubTab = document.createElement('div');
+  hubTab.className = 'tab' + (activeTab === 'hub' ? ' active' : ''); hubTab.textContent = 'HUB';
+  hubTab.onclick = () => { activeTab = 'hub'; selected = null; tool = 'select'; onTabChange(); };
+  t.appendChild(hubTab);
+  data.rooms.forEach((r, i) => {
+    const d = document.createElement('div');
+    d.className = 'tab' + (activeTab === i ? ' active' : '');
+    d.textContent = (i) + ': ' + (r.title || '?');
+    d.onclick = () => { activeTab = i; selected = null; tool = 'select'; onTabChange(); };
+    t.appendChild(d);
+  });
+}
+function onTabChange() { renderTabs(); renderToolbar(); centerView(); renderMeta(); draw(); }
+
+function centerView() {
+  const b = activeBounds();
+  const cw = cv.parentElement.clientWidth, ch = cv.parentElement.clientHeight;
+  pan.x = cw / 2 - ((b.x0 + b.x1) / 2) * PX;
+  pan.y = ch / 2 - ((b.z0 + b.z1) / 2) * PX;
+}
+
+/* -------------------------------------------------------------- drawing */
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#0d1013'; ctx.fillRect(0, 0, cv.width, cv.height);
+  drawGrid();
+  if (activeTab === 'hub') drawHub(); else drawRoom(activeRoom());
+  if (drag && drag.previewRect) drawPreviewRect(drag.previewRect);
+}
+function drawGrid() {
+  ctx.strokeStyle = '#181c21'; ctx.lineWidth = 1;
+  const [x0] = pxToWorld(0, 0), [x1] = pxToWorld(cv.width, 0);
+  const [, z0] = pxToWorld(0, 0), [, z1] = pxToWorld(0, cv.height);
+  for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
+    ctx.strokeStyle = x % 5 === 0 ? '#262c33' : '#15181c';
+    const [px] = worldToPx(x, 0); ctx.beginPath(); ctx.moveTo(px + .5, 0); ctx.lineTo(px + .5, cv.height); ctx.stroke();
+  }
+  for (let z = Math.floor(z0); z <= Math.ceil(z1); z++) {
+    ctx.strokeStyle = z % 5 === 0 ? '#262c33' : '#15181c';
+    const [, pz] = worldToPx(0, z); ctx.beginPath(); ctx.moveTo(0, pz + .5); ctx.lineTo(cv.width, pz + .5); ctx.stroke();
+  }
+  const [ax, az] = worldToPx(0, 0);
+  ctx.strokeStyle = '#3a4450'; ctx.beginPath(); ctx.moveTo(ax + .5, 0); ctx.lineTo(ax + .5, cv.height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, az + .5); ctx.lineTo(cv.width, az + .5); ctx.stroke();
+}
+function rectPath(x, z, w, d) { const [px, pz] = worldToPx(x, z); ctx.rect(px, pz, w * PX, d * PX); }
+function fillLabel(text, x, z, color) {
+  ctx.fillStyle = color || '#cfd6da'; ctx.font = '10px monospace';
+  const [px, pz] = worldToPx(x, z); ctx.fillText(text, px + 2, pz - 3);
+}
+function isSel(kind, arr, idx) { return selected && selected.kind === kind && selected.arr === arr && selected.idx === idx; }
+function strokeSel() { ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); }
+
+function drawRoom(r) {
+  if (!r) return;
+  // bounds — the room's own "floor"; drag empty space inside it to move
+  // the whole room, contents included
+  ctx.beginPath(); rectPath(r.bounds.x0, r.bounds.z0, r.bounds.x1 - r.bounds.x0, r.bounds.z1 - r.bounds.z0);
+  ctx.strokeStyle = selected && selected.kind === 'bounds' ? '#fff' : '#454f5a';
+  ctx.lineWidth = selected && selected.kind === 'bounds' ? 3 : 2;
+  ctx.stroke();
+  // solids
+  (r.solids || []).forEach((s, i) => {
+    const [x, y, z, w, h, d, mat] = s;
+    ctx.beginPath(); rectPath(x, z, w, d);
+    ctx.fillStyle = TYPE_COLOR.solid + 'aa'; ctx.fill();
+    ctx.strokeStyle = '#4a5560'; ctx.lineWidth = 1; ctx.stroke();
+    if (isSel('solid', r.solids, i)) strokeSel();
+    fillLabel(mat || 'solid', x, z);
+  });
+  // objects
+  (r.objects || []).forEach((o, i) => {
+    drawObject(o, r.objects, i);
+  });
+  // frags
+  (r.frags || []).forEach((f, i) => {
+    const [px, pz] = worldToPx(f.x, f.z);
+    ctx.beginPath(); ctx.arc(px, pz, 5, 0, 7); ctx.fillStyle = TYPE_COLOR.frag; ctx.fill();
+    if (isSel('frag', r.frags, i)) strokeSel();
+    fillLabel('frag', f.x, f.z, TYPE_COLOR.frag);
+  });
+  // lamps
+  (r.lamps || []).forEach((l, i) => {
+    const [px, pz] = worldToPx(l[0], l[2]);
+    ctx.beginPath(); ctx.arc(px, pz, 4, 0, 7); ctx.fillStyle = l[3] ? TYPE_COLOR.lamp : '#333'; ctx.fill();
+    if (isSel('lamp', r.lamps, i)) strokeSel();
+  });
+  // spawn / exit
+  drawMarker(r.spawn.x, r.spawn.z, TYPE_COLOR.spawn, 'spawn');
+  drawMarker(r.exit.x, r.exit.z, TYPE_COLOR.exit, 'exit');
+}
+function drawObject(o, arr, i) {
+  const color = TYPE_COLOR[o.t] || '#fff';
+  if (o.t === 'laser') {
+    const [ax, az] = worldToPx(o.x1, o.z1), [bx, bz] = worldToPx(o.x2, o.z2);
+    ctx.beginPath(); ctx.moveTo(ax, az); ctx.lineTo(bx, bz); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+    if (isSel('object', arr, i)) { ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore(); }
+    fillLabel('laser off:' + (o.off || '?'), o.x1, o.z1, color);
+    return;
+  }
+  const w = o.w || (o.t === 'button' ? 0.9 : o.t === 'crusher' ? o.w : 1.2), d = o.d || w;
+  ctx.beginPath();
+  if (o.t === 'plate' || o.t === 'door' || o.t === 'crusher' || o.t === 'elevator') rectPath(o.x - w / 2, o.z - d / 2, w, d);
+  else { const [px, pz] = worldToPx(o.x, o.z); ctx.arc(px, pz, 7, 0, 7); }
+  ctx.fillStyle = color + '99'; ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  if (isSel('object', arr, i)) strokeSel();
+  fillLabel(o.t + (o.id ? ':' + o.id : ''), o.x - w / 2, o.z - d / 2, color);
+}
+function drawMarker(x, z, color, label) {
+  const [px, pz] = worldToPx(x, z);
+  ctx.beginPath(); ctx.moveTo(px, pz - 7); ctx.lineTo(px + 6, pz + 5); ctx.lineTo(px - 6, pz + 5); ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+  fillLabel(label, x, z, color);
+}
+function drawHub() {
+  const h = data.hub;
+  ctx.beginPath(); rectPath(h.bounds.x0, h.bounds.z0, h.bounds.x1 - h.bounds.x0, h.bounds.z1 - h.bounds.z0);
+  ctx.strokeStyle = selected && selected.kind === 'bounds' ? '#fff' : '#454f5a';
+  ctx.lineWidth = selected && selected.kind === 'bounds' ? 3 : 2;
+  ctx.stroke();
+  (h.floors || []).forEach((f, i) => {
+    const b = f.bounds;
+    ctx.beginPath(); rectPath(b.x0, b.z0, b.x1 - b.x0, b.z1 - b.z0);
+    ctx.fillStyle = TYPE_COLOR.floor + 'cc'; ctx.fill(); ctx.strokeStyle = '#3a4450'; ctx.stroke();
+    if (isSel('floor', h.floors, i)) strokeSel();
+    fillLabel('floor y=' + f.y, b.x0, b.z0, TYPE_COLOR.floor);
+  });
+  (h.stairs || []).forEach((s, i) => {
+    const len = s.steps * (s.run || 1.05);
+    ctx.beginPath(); rectPath(s.x0, s.z0, len, s.w);
+    ctx.fillStyle = TYPE_COLOR.stair + 'aa'; ctx.fill(); ctx.strokeStyle = '#8a97a2'; ctx.stroke();
+    if (isSel('stair', h.stairs, i)) strokeSel();
+    fillLabel('stair →y' + (s.fromY + s.steps * s.rise).toFixed(1), s.x0, s.z0, TYPE_COLOR.stair);
+  });
+  (h.doors || []).forEach((o, i) => {
+    const w = o.w || 1.7;
+    ctx.beginPath(); rectPath(o.x - w / 2, o.z - 0.4, w, 0.8);
+    ctx.fillStyle = TYPE_COLOR.hubdoor + 'aa'; ctx.fill(); ctx.strokeStyle = TYPE_COLOR.hubdoor; ctx.stroke();
+    if (isSel('hubdoor', h.doors, i)) strokeSel();
+    fillLabel('→room ' + o.to + (o.need ? ' [' + o.need.join(',') + ']' : ' [open]'), o.x - w / 2, o.z - 0.4, TYPE_COLOR.hubdoor);
+  });
+  (h.lamps || []).forEach((l, i) => {
+    const [px, pz] = worldToPx(l[0], l[2]);
+    ctx.beginPath(); ctx.arc(px, pz, 4, 0, 7); ctx.fillStyle = l[3] ? TYPE_COLOR.lamp : '#333'; ctx.fill();
+    if (isSel('lamp', h.lamps, i)) strokeSel();
+  });
+  drawMarker(h.spawn.x, h.spawn.z, TYPE_COLOR.spawn, 'spawn');
+}
+function drawPreviewRect(r) {
+  ctx.beginPath(); rectPath(r.x, r.z, r.w, r.d);
+  ctx.strokeStyle = '#fff'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* -------------------------------------------------------------- picking */
+function hitTest(wx, wz) {
+  const r = activeTab === 'hub' ? null : activeRoom();
+  const h = data.hub;
+  const near = (ax, az, tol) => Math.hypot(wx - ax, wz - az) < tol;
+  if (r) {
+    for (let i = (r.objects || []).length - 1; i >= 0; i--) {
+      const o = r.objects[i];
+      if (o.t === 'laser') { if (pointNearSegment(wx, wz, o.x1, o.z1, o.x2, o.z2, 0.3)) return { kind: 'object', arr: r.objects, idx: i }; continue; }
+      const w = o.w || 1.2, d = o.d || w;
+      if (wx > o.x - w / 2 - 0.2 && wx < o.x + w / 2 + 0.2 && wz > o.z - d / 2 - 0.2 && wz < o.z + d / 2 + 0.2) return { kind: 'object', arr: r.objects, idx: i };
+    }
+    for (let i = (r.frags || []).length - 1; i >= 0; i--) if (near(r.frags[i].x, r.frags[i].z, 0.5)) return { kind: 'frag', arr: r.frags, idx: i };
+    for (let i = (r.lamps || []).length - 1; i >= 0; i--) if (near(r.lamps[i][0], r.lamps[i][2], 0.4)) return { kind: 'lamp', arr: r.lamps, idx: i };
+    for (let i = (r.solids || []).length - 1; i >= 0; i--) {
+      const [x, y, z, w, hh, d] = r.solids[i];
+      if (wx > x && wx < x + w && wz > z && wz < z + d) return { kind: 'solid', arr: r.solids, idx: i };
+    }
+  } else {
+    for (let i = (h.doors || []).length - 1; i >= 0; i--) if (near(h.doors[i].x, h.doors[i].z, 0.9)) return { kind: 'hubdoor', arr: h.doors, idx: i };
+    for (let i = (h.lamps || []).length - 1; i >= 0; i--) if (near(h.lamps[i][0], h.lamps[i][2], 0.4)) return { kind: 'lamp', arr: h.lamps, idx: i };
+    for (let i = (h.stairs || []).length - 1; i >= 0; i--) {
+      const s = h.stairs[i], len = s.steps * (s.run || 1.05);
+      if (wx > s.x0 && wx < s.x0 + len && wz > s.z0 && wz < s.z0 + s.w) return { kind: 'stair', arr: h.stairs, idx: i };
+    }
+    for (let i = (h.floors || []).length - 1; i >= 0; i--) {
+      const b = h.floors[i].bounds;
+      if (wx > b.x0 && wx < b.x1 && wz > b.z0 && wz < b.z1) return { kind: 'floor', arr: h.floors, idx: i };
+    }
+  }
+  // nothing more specific under the cursor — grab the room/hub footprint
+  // itself (the "floor") so the whole thing, contents included, can be
+  // dragged into place instead of only resized via the x0/x1/z0/z1 fields.
+  const b = activeBounds();
+  if (wx > b.x0 && wx < b.x1 && wz > b.z0 && wz < b.z1) return { kind: 'bounds', arr: null, idx: -1 };
+  return null;
+}
+function pointNearSegment(px, pz, x1, z1, x2, z2, tol) {
+  const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1;
+  let t = ((px - x1) * dx + (pz - z1) * dz) / l2; t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cz = z1 + t * dz;
+  return Math.hypot(px - cx, pz - cz) < tol;
+}
+
+/* ------------------------------------------------------------- pointer */
+let panning = null;
+cv.addEventListener('mousedown', e => {
+  const wx0 = pxToWorld(e.offsetX, e.offsetY)[0], wz0 = pxToWorld(e.offsetX, e.offsetY)[1];
+  const wx = snap(wx0), wz = snap(wz0);
+  if (e.button === 2 || e.shiftKey) { panning = { sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y }; return; }
+  if (tool === 'select') {
+    const hit = hitTest(wx0, wz0);
+    selected = hit; renderMeta(); draw();
+    if (hit) drag = { moving: true, hit, start: { wx, wz } };
+    return;
+  }
+  startPlace(tool, wx, wz);
+});
+window.addEventListener('mousemove', e => {
+  if (panning) { pan.x = panning.px + (e.clientX - panning.sx); pan.y = panning.py + (e.clientY - panning.sy); draw(); return; }
+  const rect = cv.getBoundingClientRect();
+  const ex = e.clientX - rect.left, ey = e.clientY - rect.top;
+  const [wx0, wz0] = pxToWorld(ex, ey);
+  const wx = snap(wx0), wz = snap(wz0);
+  if (drag && drag.moving && drag.hit) { moveSelected(wx, wz); draw(); return; }
+  if (drag && drag.rectStart) { drag.previewRect = rectFrom(drag.rectStart, { wx, wz }); draw(); }
+});
+window.addEventListener('mouseup', e => {
+  panning = null;
+  if (drag && drag.moving) { drag = null; syncPropsBox(); return; }
+  if (drag && drag.rectStart) { finishRectPlace(); return; }
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => { e.preventDefault(); }, { passive: false });
+function snap(v) { return Math.round(v * 4) / 4; } // quarter-unit grid
+function rectFrom(a, b) { return { x: Math.min(a.wx, b.wx), z: Math.min(a.wz, b.wz), w: Math.max(0.2, Math.abs(b.wx - a.wx)), d: Math.max(0.2, Math.abs(b.wz - a.wz)) }; }
+
+function startPlace(t, wx, wz) {
+  const r = activeRoom();
+  if (t === 'solid') { drag = { rectStart: { wx, wz } }; return; }
+  if (t === 'spawn') { r.spawn = { x: wx, z: wz }; draw(); return; }
+  if (t === 'exit') { r.exit = { x: wx, z: wz }; draw(); return; }
+  if (t === 'floor') { drag = { rectStart: { wx, wz }, isFloor: true }; return; }
+  if (t === 'stair') { const s = JSON.parse(JSON.stringify(HUB_STAIR_DEFAULT)); s.x0 = wx; s.z0 = wz; data.hub.stairs.push(s); select('stair', data.hub.stairs, data.hub.stairs.length - 1); return; }
+  if (t === 'hubdoor') { const o = JSON.parse(JSON.stringify(HUB_DOOR_DEFAULT)); o.x = wx; o.z = wz; o.to = data.rooms.length ? 0 : 0; data.hub.doors.push(o); select('hubdoor', data.hub.doors, data.hub.doors.length - 1); return; }
+  if (t === 'lamp') { const arr = r ? (r.lamps = r.lamps || []) : (data.hub.lamps = data.hub.lamps || []); arr.push([wx, r ? 6 : 9, wz, 1]); select('lamp', arr, arr.length - 1); return; }
+  if (t === 'frag') {
+    const text = prompt('Fragment text (HTML allowed):', 'A fragment of the story.'); if (text == null) return;
+    r.frags = r.frags || []; r.frags.push({ x: wx, z: wz, text }); select('frag', r.frags, r.frags.length - 1); return;
+  }
+  if (t === 'laser') {
+    if (!drag || !drag.laserFirst) { drag = { laserFirst: { wx, wz } }; return; }
+    const o = JSON.parse(JSON.stringify(OBJECT_DEFAULTS.laser));
+    o.x1 = drag.laserFirst.wx; o.z1 = drag.laserFirst.wz; o.x2 = wx; o.z2 = wz;
+    r.objects.push(o); drag = null; select('object', r.objects, r.objects.length - 1); return;
+  }
+  if (OBJECT_DEFAULTS[t]) {
+    const o = JSON.parse(JSON.stringify(OBJECT_DEFAULTS[t])); o.x = wx; o.z = wz;
+    if (o.id) o.id = o.id + (r.objects.length);
+    r.objects.push(o); select('object', r.objects, r.objects.length - 1); return;
+  }
+  draw();
+}
+function finishRectPlace() {
+  const r = drag.previewRect;
+  if (drag.isFloor) {
+    const f = JSON.parse(JSON.stringify(HUB_FLOOR_DEFAULT));
+    f.bounds = { x0: r.x, x1: r.x + r.w, z0: r.z, z1: r.z + r.d };
+    data.hub.floors.push(f); select('floor', data.hub.floors, data.hub.floors.length - 1);
+  } else {
+    const room = activeRoom();
+    room.solids = room.solids || [];
+    room.solids.push([r.x, 0, r.z, r.w, 1.2, r.d, 'crate']);
+    select('solid', room.solids, room.solids.length - 1);
+  }
+  drag = null; draw();
+}
+function moveSelected(wx, wz) {
+  // every kind moves by the delta since the last move event, not by
+  // snapping its corner/anchor to the raw cursor position — otherwise
+  // whatever you grabbed jumps to the pointer instead of following it.
+  const dx = wx - drag.start.wx, dz = wz - drag.start.wz;
+  drag.start = { wx, wz };
+  if (dx === 0 && dz === 0) return;
+  const { kind, arr, idx } = drag.hit;
+  if (kind === 'bounds') { shiftEverything(dx, dz); }
+  else if (kind === 'solid') { const s = arr[idx]; s[0] += dx; s[2] += dz; }
+  else if (kind === 'object') { const o = arr[idx]; if (o.t === 'laser') { o.x1 += dx; o.z1 += dz; o.x2 += dx; o.z2 += dz; } else { o.x += dx; o.z += dz; } }
+  else if (kind === 'frag' || kind === 'hubdoor') { arr[idx].x += dx; arr[idx].z += dz; }
+  else if (kind === 'lamp') { arr[idx][0] += dx; arr[idx][2] += dz; }
+  else if (kind === 'stair') { arr[idx].x0 += dx; arr[idx].z0 += dz; }
+  else if (kind === 'floor') { const b = arr[idx].bounds; b.x0 += dx; b.x1 += dx; b.z0 += dz; b.z1 += dz; }
+  selected = drag.hit;
+}
+// Moving the room/hub "floor" (its bounds) drags everything inside it along
+// too, so you reposition the whole footprint rather than tearing the
+// boundary away from its contents.
+function shiftEverything(dx, dz) {
+  const r = activeTab === 'hub' ? null : activeRoom();
+  if (r) {
+    const b = r.bounds; b.x0 += dx; b.x1 += dx; b.z0 += dz; b.z1 += dz;
+    r.spawn.x += dx; r.spawn.z += dz; r.exit.x += dx; r.exit.z += dz;
+    (r.solids || []).forEach(s => { s[0] += dx; s[2] += dz; });
+    (r.objects || []).forEach(o => { if (o.t === 'laser') { o.x1 += dx; o.z1 += dz; o.x2 += dx; o.z2 += dz; } else { o.x += dx; o.z += dz; } });
+    (r.frags || []).forEach(f => { f.x += dx; f.z += dz; });
+    (r.lamps || []).forEach(l => { l[0] += dx; l[2] += dz; });
+    if (r.deckZone) { r.deckZone.x += dx; r.deckZone.z += dz; }
+  } else {
+    const h = data.hub;
+    const b = h.bounds; b.x0 += dx; b.x1 += dx; b.z0 += dz; b.z1 += dz;
+    h.spawn.x += dx; h.spawn.z += dz;
+    (h.doors || []).forEach(o => { o.x += dx; o.z += dz; });
+    (h.lamps || []).forEach(l => { l[0] += dx; l[2] += dz; });
+    (h.stairs || []).forEach(s => { s.x0 += dx; s.z0 += dz; });
+    (h.floors || []).forEach(f => { f.bounds.x0 += dx; f.bounds.x1 += dx; f.bounds.z0 += dz; f.bounds.z1 += dz; });
+  }
+}
+function select(kind, arr, idx) { selected = { kind, arr, idx }; tool = 'select'; renderToolbar(); renderMeta(); draw(); }
+
+/* ---------------------------------------------------------- properties */
+function renderMeta() {
+  const m = $('#meta'); m.innerHTML = '';
+  if (activeTab === 'hub') renderHubMeta(m); else renderRoomMeta(m, activeRoom());
+  renderPropsBox(m);
+}
+function field(container, label, obj, key, type, onChange) {
+  const row = document.createElement('div'); row.className = 'row';
+  const l = document.createElement('label'); l.textContent = label; row.appendChild(l);
+  const i = document.createElement('input'); i.type = type || 'text';
+  i.value = obj[key] == null ? '' : obj[key];
+  i.onchange = () => { obj[key] = type === 'number' ? parseFloat(i.value) || 0 : i.value; (onChange || draw)(); };
+  row.appendChild(i); container.appendChild(row);
+}
+function renderRoomMeta(m, r) {
+  const h = document.createElement('h3'); h.textContent = 'Room ' + activeTab; m.appendChild(h);
+  field(m, 'Title', r, 'title'); field(m, 'Sub', r, 'sub'); field(m, 'Num', r, 'num');
+  field(m, 'Time (s)', r, 'time', 'number'); field(m, 'Max Shadows', r, 'maxShadows', 'number');
+  field(m, 'Ceiling', r, 'ceil', 'number');
+  const bh = document.createElement('h3'); bh.textContent = 'Bounds'; m.appendChild(bh);
+  field(m, 'x0', r.bounds, 'x0', 'number', centerAndDraw); field(m, 'x1', r.bounds, 'x1', 'number', centerAndDraw);
+  field(m, 'z0', r.bounds, 'z0', 'number', centerAndDraw); field(m, 'z1', r.bounds, 'z1', 'number', centerAndDraw);
+  const hh = document.createElement('h3'); hh.textContent = 'Hint text'; m.appendChild(hh);
+  const ta = document.createElement('textarea'); ta.style.height = '60px'; ta.value = r.hint || '';
+  ta.onchange = () => r.hint = ta.value; m.appendChild(ta);
+  const del = document.createElement('button'); del.textContent = 'Delete this room'; del.style.marginTop = '10px';
+  del.onclick = () => {
+    if (!confirm('Delete room ' + activeTab + '? Hub doors pointing to it (or later rooms) will need fixing manually.')) return;
+    data.rooms.splice(activeTab, 1); activeTab = 'hub'; selected = null; onTabChange();
+  };
+  m.appendChild(del);
+}
+function centerAndDraw() { centerView(); draw(); }
+function renderHubMeta(m) {
+  const h = data.hub;
+  const t = document.createElement('h3'); t.textContent = 'Hub'; m.appendChild(t);
+  field(m, 'Ceiling', h, 'ceil', 'number');
+  const bh = document.createElement('h3'); bh.textContent = 'Bounds'; m.appendChild(bh);
+  field(m, 'x0', h.bounds, 'x0', 'number', centerAndDraw); field(m, 'x1', h.bounds, 'x1', 'number', centerAndDraw);
+  field(m, 'z0', h.bounds, 'z0', 'number', centerAndDraw); field(m, 'z1', h.bounds, 'z1', 'number', centerAndDraw);
+  const sh = document.createElement('h3'); sh.textContent = 'Spawn'; m.appendChild(sh);
+  field(m, 'x', h.spawn, 'x', 'number'); field(m, 'z', h.spawn, 'z', 'number');
+  const hint = document.createElement('div'); hint.className = 'hint';
+  hint.innerHTML = 'Doors need <b>to</b> = a room index (shown on the tabs). ' +
+    '<b>need</b> is a list of key ids like <code>k0</code> — room N grants key <code>kN</code> when finished. ' +
+    'Leave need empty/null for an always-open door.';
+  m.appendChild(hint);
+}
+function deleteButton(box) {
+  const del = document.createElement('button'); del.textContent = 'Delete'; del.style.marginTop = '8px';
+  del.onclick = () => { selected.arr.splice(selected.idx, 1); selected = null; renderMeta(); draw(); };
+  box.appendChild(del);
+}
+function renderPropsBox(m) {
+  const h = document.createElement('h3'); h.textContent = 'Selected item'; m.appendChild(h);
+  const box = document.createElement('div'); box.id = 'propsBox'; m.appendChild(box);
+  if (!selected) { box.innerHTML = '<div class="small">Click something with Select to edit its exact fields here (ids, req lists, timings, text…).</div>'; return; }
+  if (selected.kind === 'bounds') { box.innerHTML = '<div class="small">This is the floor itself — drag it to move the whole room/hub (everything inside moves with it). Resize it from the Bounds fields above instead.</div>'; return; }
+  if (selected.kind === 'lamp') { renderLampForm(box); return; }
+  if (selected.kind === 'stair') { renderStairForm(box); return; }
+  if (selected.kind === 'floor') { renderFloorForm(box); return; }
+  const ta = document.createElement('textarea');
+  ta.value = JSON.stringify(selected.kind === 'solid' ? solidToObj(selected.arr[selected.idx]) : selected.arr[selected.idx], null, 2);
+  box.appendChild(ta);
+  const row = document.createElement('div'); row.style.marginTop = '6px'; row.style.display = 'flex'; row.style.gap = '6px';
+  const apply = document.createElement('button'); apply.textContent = 'Apply'; apply.className = 'primary';
+  apply.onclick = () => {
+    try {
+      const parsed = JSON.parse(ta.value);
+      if (selected.kind === 'solid') selected.arr[selected.idx] = objToSolid(parsed);
+      else selected.arr[selected.idx] = parsed;
+      draw();
+    } catch (e) { showErr('Invalid JSON: ' + e.message); }
+  };
+  const del = document.createElement('button'); del.textContent = 'Delete';
+  del.onclick = () => { selected.arr.splice(selected.idx, 1); selected = null; renderMeta(); draw(); };
+  row.appendChild(apply); row.appendChild(del); box.appendChild(row);
+}
+function syncPropsBox() { renderMeta(); }
+function solidToObj(s) { return { x: s[0], y: s[1], z: s[2], w: s[3], h: s[4], d: s[5], mat: s[6] }; }
+function objToSolid(o) { return [o.x, o.y, o.z, o.w, o.h, o.d, o.mat]; }
+
+// lamps are stored as the plain [x, y, z, alive] tuples the game reads
+// directly, so this reads/writes the array by index behind normal-looking
+// number fields instead of raw JSON.
+function renderLampForm(box) {
+  const l = selected.arr[selected.idx];
+  const proxy = { x: l[0], y: l[1], z: l[2] };
+  field(box, 'X (position)', proxy, 'x', 'number', () => { l[0] = proxy.x; draw(); });
+  field(box, 'Y (height)', proxy, 'y', 'number', () => { l[1] = proxy.y; draw(); });
+  field(box, 'Z (position)', proxy, 'z', 'number', () => { l[2] = proxy.z; draw(); });
+  const row = document.createElement('div'); row.className = 'row';
+  const lab = document.createElement('label'); lab.textContent = 'Working?'; row.appendChild(lab);
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="1">on</option><option value="0">burned out</option>';
+  sel.value = l[3] ? '1' : '0';
+  sel.onchange = () => { l[3] = sel.value === '1' ? 1 : 0; draw(); };
+  row.appendChild(sel); box.appendChild(row);
+  deleteButton(box);
+}
+// a stair's position is its bottom-left corner (x0, z0); its size is how
+// many steps, how wide, and how tall/deep each one is.
+function renderStairForm(box) {
+  const s = selected.arr[selected.idx];
+  const h3 = document.createElement('div'); h3.className = 'small'; h3.textContent = 'Position'; box.appendChild(h3);
+  field(box, 'X0', s, 'x0', 'number', draw); field(box, 'Z0', s, 'z0', 'number', draw);
+  field(box, 'Start height', s, 'fromY', 'number', draw);
+  const h4 = document.createElement('div'); h4.className = 'small'; h4.style.marginTop = '8px'; h4.textContent = 'Size'; box.appendChild(h4);
+  field(box, 'Width', s, 'w', 'number', draw);
+  field(box, 'Steps', s, 'steps', 'number', draw);
+  field(box, 'Rise/step', s, 'rise', 'number', draw);
+  field(box, 'Run/step', s, 'run', 'number', draw);
+  const frow = document.createElement('div'); frow.className = 'row';
+  const flab = document.createElement('label'); flab.textContent = 'Orientation'; frow.appendChild(flab);
+  const fsel = document.createElement('select');
+  fsel.innerHTML = '<option value="0">climbs toward +X</option><option value="1">climbs toward -X (flipped)</option>';
+  fsel.value = s.flip ? '1' : '0';
+  fsel.onchange = () => { s.flip = fsel.value === '1'; draw(); };
+  frow.appendChild(fsel); box.appendChild(frow);
+  const top = (s.fromY || 0) + s.steps * s.rise;
+  const note = document.createElement('div'); note.className = 'small'; note.style.marginTop = '6px';
+  note.textContent = 'Climbs to y=' + top.toFixed(2) + ' — a floor slab landing here should use that same y.';
+  box.appendChild(note);
+  deleteButton(box);
+}
+// a floor slab's position and size are both just its bounds rectangle,
+// plus the height it sits at.
+function renderFloorForm(box) {
+  const f = selected.arr[selected.idx];
+  field(box, 'Height (y)', f, 'y', 'number', draw);
+  const h3 = document.createElement('div'); h3.className = 'small'; h3.style.marginTop = '8px'; h3.textContent = 'Position + size (bounds)'; box.appendChild(h3);
+  field(box, 'X0', f.bounds, 'x0', 'number', draw); field(box, 'X1', f.bounds, 'x1', 'number', draw);
+  field(box, 'Z0', f.bounds, 'z0', 'number', draw); field(box, 'Z1', f.bounds, 'z1', 'number', draw);
+  deleteButton(box);
+}
+
+/* -------------------------------------------------------------- add room */
+$('#addRoom').onclick = () => {
+  data.rooms.push(newRoom(data.rooms.length));
+  activeTab = data.rooms.length - 1; selected = null; tool = 'select';
+  onTabChange();
+  setStatus('Added room ' + activeTab + ' — add a hub door with "to": ' + activeTab + ' to reach it.');
+};
+
+/* ------------------------------------------------------------ load/save */
+async function load() {
+  setStatus('loading…');
+  try {
+    const res = await fetch('levels.json?v=' + Date.now());
+    if (!res.ok) throw new Error('no levels.json yet');
+    data = await res.json();
+    setStatus('loaded levels.json');
+  } catch (e) {
+    setStatus('no levels.json — starting from defaults');
+  }
+  activeTab = 'hub'; selected = null;
+  renderTabs(); renderToolbar(); centerView(); renderMeta(); draw();
+}
+async function save() {
+  setStatus('saving…');
+  try {
+    const res = await fetch('/api/save-levels', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'save failed');
+    setStatus('saved ✓ — reload the game to see it');
+  } catch (e) { showErr('Save failed: ' + e.message); setStatus('save failed'); }
+}
+$('#saveBtn').onclick = save;
+$('#reloadBtn').onclick = load;
+window.addEventListener('resize', () => { centerView(); draw(); });
+
+load();
+</script>
+</body>
+</html>
