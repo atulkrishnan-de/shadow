@@ -175,7 +175,23 @@ const Audio = (() => {
     master.gain.linearRampToValueAtTime(low, t + 0.03); master.gain.setValueAtTime(low, t + holdSec);
     master.gain.linearRampToValueAtTime(MASTER_BASE, t + holdSec + 0.05);
   }
-  return { unlock, S, ambientLevel, klaxonLevel, anchorLevel, duck, get ok() { return ready; } };
+  let bgm = null, bgmGain = null;
+  function startBGM() {
+    if (!ready || bgm) return;
+    bgm = new window.Audio('assets/ihatetuesdays-jungle-ish-beat-for-video-games-314073.mp3');
+    bgm.loop = true;
+    bgm.volume = 0;
+    bgm.play().catch(() => {});
+    const src = ctx.createMediaElementSource(bgm);
+    bgmGain = ctx.createGain(); bgmGain.gain.value = 0;
+    src.connect(bgmGain).connect(master);
+    bgmGain.gain.setTargetAtTime(0.35, ctx.currentTime, 1.5);
+    bgm.volume = 1;
+  }
+  function bgmLevel(v) {
+    if (bgmGain) bgmGain.gain.setTargetAtTime(v, ctx.currentTime, 0.8);
+  }
+  return { unlock, S, ambientLevel, klaxonLevel, anchorLevel, duck, startBGM, bgmLevel, get ok() { return ready; } };
 })();
 
 const BASE_FOG = 0.026, BASE_EXPOSURE = 1.2;
@@ -419,8 +435,7 @@ function sealDoorway(x, doorZ, w, y, h, z0, z1) {
   const half = w / 2;
   const build = (dz0, dz1) => {
     if (dz1 - dz0 <= 0.05) return;
-    const s = { x: x - 0.35, y, z: dz0, w: 0.7, h, d: dz1 - dz0 };
-    pushSolid(s); occludingBox(s.w, s.h, s.d, M.wall, s.x, s.y, s.z);
+    pushSolid({ x: x - 0.35, y, z: dz0, w: 0.7, h, d: dz1 - dz0 });
   };
   build(z0, doorZ - half);
   build(doorZ + half, z1);
@@ -765,7 +780,7 @@ function addEntity(o) {
   else if (o.t === 'button') e = new Button(o);
   else if (o.t === 'door') {
     e = new Door(o);
-    sealDoorway(o.x, o.z, o.w || 2.4, o.y || 0, FACILITY.ceil, FACILITY.z0, FACILITY.z1);
+    if (!o.onWall) sealDoorway(o.x, o.z, o.w || 2.4, o.y || 0, FACILITY.ceil, FACILITY.z0, FACILITY.z1);
   }
   else if (o.t === 'crusher') e = new Crusher(o);
   else if (o.t === 'elevator') e = new Elevator(o);
@@ -781,10 +796,10 @@ function decorateFacility() {
   spawnProp('lab-magnifier', 17.3, 0.75, 12.3, 1, 0.2);
   spawnProp('lab-glasses', 34.4, 0, 3.2, 1, 0);
   spawnProp('lab-gloves', 33.6, 0, 3.6, 1, 0.5);
-  spawnProp('lab-counter', 48.5, 2.4, 10.5, 1, Math.PI / 2);
-  spawnProp('scifi-computer', 48.85, 3.1, 10.2, 1, 0.3);
-  spawnProp('scifi-access', 52, 2.4, 12, 1, -0.6);
-  spawnProp('scifi-chest', 51, 2.4, 8.8, 1, 0.2);
+  spawnProp('lab-counter', 48.5, 0, 3.5, 1, Math.PI / 2);
+  spawnProp('scifi-computer', 48.85, 0.7, 3.2, 1, 0.3);
+  spawnProp('scifi-access', 52, 0, 2, 1, -0.6);
+  spawnProp('scifi-chest', 51, 0, 0, 1, 0.2);
 }
 
 function buildFacility() {
@@ -797,9 +812,12 @@ function buildFacility() {
   wallSolid(b.x0 - WT, 0, b.z0 - WT, WT, c, b.z1 - b.z0 + WT * 2);
   wallSolid(b.x1, 0, b.z0 - WT, WT, c, b.z1 - b.z0 + WT * 2);
 
-  internalWall(14.5, b.z0, b.z1, 1.5, 5, c);
+  internalWall(14.5, b.z0, b.z1, 2, 5, c);
   internalWall(30.5, b.z0, b.z1, 4, 8, c);
+  internalWall(40, b.z0, b.z1, 6, 10, c);
   internalWall(44.5, b.z0, b.z1, 6, 10, c);
+  internalWall(50, b.z0, b.z1, 4.5, 7.5, c);
+
 
   for (const s of [
     [6, 0, -4, 1.5, 1.3, 1.5, 'crate'], [10, 0, 5, 1.4, 1.0, 1.4, 'rust'],
@@ -809,14 +827,14 @@ function buildFacility() {
   ]) addStair(s);
 
   const objects = [
-    { t: 'plate', id: 'p1', x: 8, z: 3, w: 2.4 },
-    { t: 'door', id: 'd1', x: 13, z: 3, w: 2.4, req: ['p1'] },
+    { t: 'plate', id: 'p1', x: 8, z: 3.5, w: 2.4 },
+    { t: 'door', id: 'd1', x: 14.5, z: 3.5, w: 2.8, req: ['p1'], onWall: true },
     { t: 'keepsake', x: 4, z: -3, item: 'watch', timer: 3, text: 'Your watch.<br><span style="opacity:.55">It stopped at 09:41 and never started again.</span>' },
-    { t: 'keepsake', x: 14, z: 3, item: 'badge', timer: 5, text: 'A badge, still warm.<br><span style="opacity:.55">The photograph on it is yours.</span>' },
+    { t: 'keepsake', x: 16, z: 3.5, item: 'badge', timer: 5, text: 'A badge, still warm.<br><span style="opacity:.55">The photograph on it is yours.</span>' },
 
     { t: 'plate', id: 'pA', x: 20, z: 2, w: 2.4 },
     { t: 'plate', id: 'pB', x: 23, y: 0.84, z: 10, w: 1.8 },
-    { t: 'door', id: 'd2', x: 28, z: 6, w: 2.4, req: ['pA', 'pB'] },
+    { t: 'door', id: 'd2', x: 30.5, z: 6, w: 2.8, req: ['pA', 'pB'], onWall: true },
     { t: 'plate', id: 'pC', x: 24, z: 15, w: 2.0 },
     { t: 'laser', x1: 26.5, z1: 2, x2: 26.5, z2: 14, off: 'pC' },
     { t: 'keepsake', x: 18, z: 13, item: 'photo', timer: 3, text: 'A photograph, face down.<br><span style="opacity:.55">You do not turn it over. You already know.</span>' },
@@ -826,19 +844,16 @@ function buildFacility() {
 
     { t: 'crusher', x: 36, z: 8, w: 3.4, d: 3.4, pitY: -0.42, top: 2.6, period: 5.0, phase: 0.28 },
     { t: 'plate', id: 'pPress', x: 36, y: -0.42, z: 8, w: 2.6 },
-    { t: 'door', id: 'd3', x: 40, z: 8, w: 2.4, req: ['pPress'] },
     { t: 'ability', x: 38, z: 13, ability: 'anchor', text: 'ANCHOR — <span style="opacity:.55">Hold Q as you die to leave a Shadow that never disappears</span>' },
     { t: 'plate', id: 'pHold', x: 42, z: 8, w: 2.2 },
-    { t: 'door', id: 'd4', x: 43.5, z: 8, w: 2.4, req: ['pHold'] },
+    { t: 'door', id: 'd3', x: 44.5, z: 8, w: 2.8, req: ['pPress', 'pHold'], onWall: true },
     { t: 'keepsake', x: 34, z: 13, item: 'letter', timer: 3, text: 'A letter you never posted.<br><span style="opacity:.55">The handwriting is steadier than you remember.</span>' },
-    { t: 'keepsake', x: 41, z: 8, item: 'circuit', timer: 5, text: 'A circuit board, scorched at one corner.<br><span style="opacity:.55">It still conducts.</span>' },
+    { t: 'keepsake', x: 42, z: 12, item: 'circuit', timer: 5, text: 'A circuit board, scorched at one corner.<br><span style="opacity:.55">It still conducts.</span>' },
 
     { t: 'button', id: 'pwr', x: 47, z: 2, mode: 'latch' },
     { t: 'plate', id: 'pGate', x: 48, z: 6, w: 2.4 },
-    { t: 'door', id: 'g1', x: 50, z: 6, w: 2.4, req: ['pGate'] },
+    { t: 'door', id: 'g1', x: 50, z: 6, w: 2.8, req: ['pGate'], onWall: true },
     { t: 'elevator', id: 'lift', x: 50, z: 9, w: 3.0, d: 2.6, top: 2.4, req: 'pwr' },
-    { t: 'plate', id: 'pLaser', x: 50, y: 2.4, z: 10, w: 2.2 },
-    { t: 'laser', x1: 52, z1: 4, x2: 52, z2: 14, off: 'pLaser' },
     { t: 'button', id: 'bDoor', x: 48, z: 14, mode: 'pulse' },
     { t: 'door', id: 'g2', x: 52, z: 12, w: 2.4, req: ['bDoor'], timed: 9 },
     { t: 'plate', id: 'pFinal', x: 54, z: 14, w: 2.4 },
@@ -851,7 +866,7 @@ function buildFacility() {
     [4, 3, 0, 1], [10, 3, 3, 1],
     [18, 3, 2, 1], [24, 3, 10, 0], [28, 3, 6, 1],
     [34, 3, 4, 1], [38, 3, 8, 0], [42, 3, 8, 1],
-    [47, 3, 0, 1], [50, 3, 6, 1], [50, 3, 12, 0], [54, 3, 14, 1],
+    [47, 3, 0, 1], [50, 3, 6, 1], [54, 3, 14, 1],
   ]);
 
   World.frags = [
@@ -1320,7 +1335,7 @@ function updateWallOcclusion(dt) {
 function startEnding() {
   G.state = 'ending';
   UI.hud.hidden = true; UI.hint.classList.remove('on'); UI.frag.classList.remove('on'); UI.keepsake.classList.remove('on');
-  Audio.S.win(); Audio.ambientLevel(0.18); Audio.klaxonLevel(0);
+  Audio.S.win(); Audio.ambientLevel(0.18); Audio.klaxonLevel(0); Audio.bgmLevel(0.08);
   $('#e1').textContent = ENDING_LINES[0];
   setTimeout(() => { UI.ending.classList.add('on'); $('#e1').classList.add('on'); }, 1200);
   setTimeout(() => {
@@ -1333,6 +1348,7 @@ function startEnding() {
 function startGame() {
   UI.menu.classList.remove('on');
   buildFacility();
+  Audio.startBGM();
   if (DEV_GHOSTS > 0) G.tapes = makeTestTapes(DEV_GHOSTS);
   startRun();
   G.state = 'intro'; G.timers.intro = 0; G.camPull = 0.5;
