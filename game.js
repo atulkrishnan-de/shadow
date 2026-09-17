@@ -6,7 +6,7 @@
 'use strict';
 
 const BUILD = '23:58:00';
-const ASSET_V = 'metroidvania1';
+const ASSET_V = 'metroidvania3';
 const TICK = 1 / 60;
 const STEP_MAX = 0.46;
 const SPAWN = { x: 2, y: 0, z: 3 };
@@ -46,6 +46,15 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab'].includes(k)) e.preventDefault();
   if (!Keys[k]) Pressed[k] = true;
   Keys[k] = true;
+  if (k === 'Backquote') {
+    G.dev = !G.dev;
+    const tag = document.getElementById('devmode');
+    if (tag) tag.classList.toggle('on', G.dev);
+    if (G.dev && G.player) {
+      G.player.alive = true; G.player.rig.group.visible = true;
+      if (G.state === 'dying') G.state = 'play';
+    }
+  }
   if (anyKeyHook) { const f = anyKeyHook; anyKeyHook = null; f(); }
   Audio.unlock();
 });
@@ -222,7 +231,7 @@ addEventListener('resize', () => {
 });
 
 const PAL = {
-  concrete: 0x3a3e48, concreteDark: 0x2a2e36, floor: 0x1a1c22,
+  concrete: 0x3a3e48, concreteDark: 0x2a2e36, floor: 0x2a2e38,
   steel: 0x5a5a60, steelDark: 0x2a2a32, rust: 0x4a3528, crate: 0x5a4a30,
   purple: 0x8a6dff, purpleGlow: 0xbca6ff, amber: 0xd2993b, red: 0xff4433, green: 0x4fe0a0,
   cyan: 0x4fe0ff,
@@ -280,27 +289,48 @@ function makeShadowMaterial() {
 const GEO = { box: new THREE.BoxBufferGeometry(1, 1, 1), cyl: new THREE.CylinderBufferGeometry(1, 1, 1, 12) };
 
 const PROP_DEFS = {
-  'pipe-large': { folder: 'props' },
-  'pipe-large-bend': { folder: 'props' },
-  'pipe-large-valve': { folder: 'props' },
-  'cog-a': { folder: 'props' },
-  'column-free': { folder: 'structure', mat: 'steel' },
-  'column-cap': { folder: 'structure', mat: 'steelDark' },
-  'window-a': { folder: 'structure', mat: 'glass' },
-  'corner-trim': { folder: 'structure', mat: 'steelDark' },
   'lab-counter': { folder: 'lab', scale: 0.01 },
   'lab-cabinet': { folder: 'lab', scale: 0.01 },
   'lab-glasses': { folder: 'lab', scale: 0.01 },
   'lab-gloves': { folder: 'lab', scale: 0.01 },
   'lab-extinguisher': { folder: 'lab', scale: 0.01 },
-  'lab-microscope': { folder: 'lab', scale: 0.01 },
   'lab-magnifier': { folder: 'lab', scale: 0.01 },
   'scifi-computer': { folder: 'scifi', file: 'Prop_Computer', ext: 'gltf' },
   'scifi-access': { folder: 'scifi', file: 'Prop_AccessPoint', ext: 'gltf' },
   'scifi-chest': { folder: 'scifi', file: 'Prop_Chest', ext: 'gltf' },
-  'scifi-wall': { folder: 'scifi', file: 'WallAstra_Straight', ext: 'gltf' },
   'door-metal': { folder: 'doors', file: 'Door_Metal', ext: 'gltf' },
   'door-frame': { folder: 'doors', file: 'Door_Frame_A', ext: 'gltf' },
+  'sm-crate': { folder: 'scifi-modular', file: 'Props_Crate' },
+  'sm-crate-long': { folder: 'scifi-modular', file: 'Props_CrateLong' },
+  'sm-computer': { folder: 'scifi-modular', file: 'Props_Computer' },
+  'sm-computer-sm': { folder: 'scifi-modular', file: 'Props_ComputerSmall' },
+  'sm-chest': { folder: 'scifi-modular', file: 'Props_Chest' },
+  'sm-shelf': { folder: 'scifi-modular', file: 'Props_Shelf' },
+  'sm-shelf-tall': { folder: 'scifi-modular', file: 'Props_Shelf_Tall' },
+  'sm-capsule': { folder: 'scifi-modular', file: 'Props_Capsule' },
+  'sm-pod': { folder: 'scifi-modular', file: 'Props_Pod' },
+  'sm-vessel': { folder: 'scifi-modular', file: 'Props_Vessel' },
+  'sm-container': { folder: 'scifi-modular', file: 'Props_ContainerFull' },
+  'sm-statue': { folder: 'scifi-modular', file: 'Props_Statue' },
+  'sm-column': { folder: 'scifi-modular', file: 'Column_1' },
+  'sm-column2': { folder: 'scifi-modular', file: 'Column_2' },
+  'sm-column-slim': { folder: 'scifi-modular', file: 'Column_Slim' },
+  'sm-pipes': { folder: 'scifi-modular', file: 'Pipes' },
+  'sm-vent': { folder: 'scifi-modular', file: 'Details_Vent_1' },
+  'sm-plate': { folder: 'scifi-modular', file: 'Details_Plate_Large' },
+  'sm-hexagon': { folder: 'scifi-modular', file: 'Details_Hexagon' },
+  'sm-output': { folder: 'scifi-modular', file: 'Details_Output' },
+  'sm-wall1': { folder: 'scifi-modular', file: 'Wall_1' },
+  'sm-wall2': { folder: 'scifi-modular', file: 'Wall_2' },
+  'sm-window': { folder: 'scifi-modular', file: 'Window_Wall_SideA' },
+  'sm-door-single': { folder: 'scifi-modular', file: 'Door_Single' },
+  'sm-door-wall': { folder: 'scifi-modular', file: 'DoorSingle_Wall_SideA' },
+  'sm-staircase': { folder: 'scifi-modular', file: 'Staircase' },
+  'sm-base': { folder: 'scifi-modular', file: 'Props_Base' },
+  'sm-laser': { folder: 'scifi-modular', file: 'Props_Laser' },
+  'sm-pipes-sm': { folder: 'scifi-modular', file: 'Details_Pipes_Small' },
+  'sm-vent2': { folder: 'scifi-modular', file: 'Details_Vent_2' },
+  'sm-plate-sm': { folder: 'scifi-modular', file: 'Details_Plate_Small' },
 };
 const PROPS = Object.create(null);
 function loadProps() {
@@ -310,10 +340,18 @@ function loadProps() {
     loader.load('assets/' + def.folder + '/' + (def.file || name) + '.' + (def.ext || 'glb') + '?v=' + ASSET_V,
       gltf => {
         gltf.scene.traverse(o => {
-          if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; if (def.mat) o.material = M[def.mat]; }
+          if (o.isMesh) {
+            o.castShadow = false; o.receiveShadow = true;
+            if (def.mat) { o.material = M[def.mat]; }
+            else if (def.folder === 'scifi-modular' && o.material) {
+              const c = o.material.color;
+              if (c) { c.r = Math.min(1, c.r * 2.8 + 0.12); c.g = Math.min(1, c.g * 2.8 + 0.12); c.b = Math.min(1, c.b * 2.8 + 0.12); }
+              o.material.metalness = 0.3; o.material.roughness = 0.6;
+            }
+          }
         });
         PROPS[name] = gltf.scene; resolve();
-      }, undefined, () => resolve());
+      }, undefined, (err) => { console.warn('PROP LOAD FAIL:', name, err); resolve(); });
   })));
 }
 function spawnProp(name, x, y, z, scale, rotY) {
@@ -357,8 +395,56 @@ function box(w, h, d, mat, x, y, z, parent) {
   return m;
 }
 
+/* ── Character model cache ── */
+const CharCache = { model: null, skinTex: null, shadowTex: null, ready: false };
+
+function loadCharacterAssets() {
+  const loader = new THREE.GLTFLoader();
+  const texLoader = new THREE.TextureLoader();
+  const base = 'assets/character/';
+  return Promise.all([
+    new Promise(r => loader.load(base + 'mixamo_combined.glb?v=' + ASSET_V, g => {
+      CharCache.model = g;
+      console.log('Character loaded, animations:', g.animations.map(a => a.name));
+      r();
+    }, undefined, (e) => { console.warn('char model fail', e); r(); })),
+  ]).then(() => {
+    if (CharCache.model) CharCache.ready = true;
+  });
+}
+
 function buildFigure(isShadow) {
   const g = new THREE.Group();
+  let mixer = null, actions = {}, curAction = null;
+
+  if (CharCache.ready && !isShadow) {
+    const src = CharCache.model.scene;
+    const clone = (typeof THREE.SkeletonUtils !== 'undefined') ? THREE.SkeletonUtils.clone(src) : src.clone();
+    clone.scale.setScalar(0.9);
+    clone.traverse(o => {
+      if (o.isMesh || o.isSkinnedMesh) {
+        o.castShadow = false; o.receiveShadow = true;
+        o.frustumCulled = false;
+      }
+    });
+    g.add(clone);
+    mixer = new THREE.AnimationMixer(clone);
+    const clipMap = { 'Idle': 'idle', 'Run': 'run', 'Jump': 'jump' };
+    for (const clip of (CharCache.model.animations || [])) {
+      for (const [keyword, key] of Object.entries(clipMap)) {
+        if (clip.name.includes(keyword)) {
+          actions[key] = mixer.clipAction(clip);
+          actions[key].clampWhenFinished = key === 'jump';
+          console.log('Anim:', key, clip.tracks.length, 'tracks');
+        }
+      }
+    }
+    if (actions.idle) { actions.idle.play(); curAction = 'idle'; }
+    return { group: g, mat: null, light: null, isShadow: false, baseEmissive: 1, glitchT: 0, phase: Math.random() * 6,
+      legL: null, legR: null, armL: null, armR: null, noGlitch: false,
+      mixer, actions, curAction, isGLTF: true };
+  }
+
   const bodyMat = isShadow ? makeShadowMaterial() : M.player;
   const headMat = isShadow ? bodyMat : M.playerDark;
   box(0.5, 0.62, 0.34, bodyMat, -0.25, 0.42, -0.17, g);
@@ -369,16 +455,31 @@ function buildFigure(isShadow) {
   const legR = box(0.18, 0.42, 0.18, headMat, 0.01, 0.0, -0.09, g);
   let light = null;
   if (isShadow) { light = new THREE.PointLight(PAL.purple, 0.6, 3.5); light.position.set(0, 0.7, 0); g.add(light); }
-  return { group: g, mat: isShadow ? bodyMat : null, light, isShadow, baseEmissive: 1, glitchT: 0, phase: Math.random() * 6, legL, legR, armL, armR, noGlitch: false };
+  return { group: g, mat: isShadow ? bodyMat : null, light, isShadow, baseEmissive: 1, glitchT: 0, phase: Math.random() * 6,
+    legL, legR, armL, armR, noGlitch: false, mixer: null, actions: {}, curAction: null, isGLTF: false };
 }
+
 function poseFigure(rig, st, dt) {
   const g = rig.group;
   const spd = Math.hypot(st.vx, st.vz);
+
   if (spd > 0.15) g.rotation.y = damp(g.rotation.y, Math.atan2(st.vx, st.vz), 16, dt);
+
+  if (rig.isGLTF && rig.mixer) {
+    const want = spd > 0.5 ? 'run' : 'idle';
+    if (want !== rig.curAction && rig.actions[want]) {
+      if (rig.actions[rig.curAction]) rig.actions[rig.curAction].fadeOut(0.2);
+      rig.actions[want].reset().fadeIn(0.2).play();
+      rig.curAction = want;
+    }
+    rig.mixer.update(dt);
+    return;
+  }
+
   rig.phase += dt * clamp(spd * 3.2, 3, 13);
   const swing = spd > 0.15 ? Math.sin(rig.phase) * clamp(spd * 0.16, 0, 0.5) : 0;
-  rig.legL.rotation.x = swing; rig.legR.rotation.x = -swing;
-  rig.armL.rotation.x = -swing * 0.8; rig.armR.rotation.x = swing * 0.8;
+  if (rig.legL) { rig.legL.rotation.x = swing; rig.legR.rotation.x = -swing; }
+  if (rig.armL) { rig.armL.rotation.x = -swing * 0.8; rig.armR.rotation.x = swing * 0.8; }
   if (rig.isShadow && rig.mat) {
     const farFromPlayer = G.player && ((st.x - G.player.x) * (st.x - G.player.x) + (st.z - G.player.z) * (st.z - G.player.z)) > 225;
     if (!farFromPlayer) {
@@ -597,36 +698,6 @@ class Crusher {
   render() { this.head.position.y = this.y; }
 }
 
-class Elevator {
-  constructor(o) {
-    this.o = o; this.y = 0; this.powered = false; this.moving = 0;
-    const g = new THREE.Group(); World.root.add(g); this.g = g; g.position.set(o.x, 0, o.z);
-    box(o.w, 0.3, o.d, M.steel, -o.w / 2, 0, -o.d / 2, g);
-    box(o.w + 0.1, 0.1, o.d + 0.1, M.rust, -o.w / 2 - 0.05, 0.3, -o.d / 2 - 0.05, g);
-    this.lampE = box(0.2, 0.2, 0.1, new THREE.MeshBasicMaterial({ color: 0x3a2a14 }), o.w / 2 - 0.1, 0.5, o.d / 2 - 0.05, g);
-    this.light = new THREE.PointLight(0xffb15e, 0, 6, 2); this.light.position.set(0, 0.8, 0); g.add(this.light);
-    this.footprint = { x: o.x - o.w / 2, z: o.z - o.d / 2, w: o.w, d: o.d };
-  }
-  logic(dt, actors) {
-    const o = this.o, powered = !!World.sig[o.req];
-    let rider = false;
-    for (const a of actors) {
-      if (!a.alive) continue;
-      if (Math.abs(a.y - this.y) < 0.5 && a.x > this.footprint.x && a.x < this.footprint.x + this.footprint.w && a.z > this.footprint.z && a.z < this.footprint.z + this.footprint.d) { rider = true; break; }
-    }
-    const dir = powered && rider ? 1 : (rider ? 0 : -1);
-    const prevY = this.y;
-    this.y = clamp(this.y + dir * 2.2 * dt, 0, o.top);
-    this.dy = this.y - prevY;
-    this.powered = powered;
-    if (Math.abs(this.dy) > 0.001) { this.moving += dt; if (this.moving > 0.45) { this.moving = 0; Audio.S.lift(); } }
-  }
-  render(dt) {
-    this.g.position.y = this.y;
-    this.lampE.material.color.setHex(this.powered ? 0xffb15e : 0x3a2a14);
-    if (!this._lightCulled) this.light.intensity = damp(this.light.intensity || 0, this.powered ? 0.8 : 0, 6, TICK);
-  }
-}
 
 class Laser {
   constructor(o) {
@@ -745,7 +816,7 @@ function addLighting() {
   const sc = sun.shadow.camera; sc.left = -30; sc.right = 62; sc.top = 22; sc.bottom = -10; sc.near = 1; sc.far = 120;
   sun.shadow.bias = -0.0015; sun.shadow.normalBias = 0.03;
   World.root.add(sun); World.root.add(sun.target); World.sun = sun;
-  World.hemi = new THREE.HemisphereLight(0x2b3d4e, 0x08090c, 0.55); World.root.add(World.hemi);
+  World.hemi = new THREE.HemisphereLight(0x3b5070, 0x101418, 0.7); World.root.add(World.hemi);
 
   const key = new THREE.PointLight(0xffa54e, 3.5, 22, 1.5);
   key.position.set(0, 3.5, 0); World.root.add(key); World.keyLight = key;
@@ -783,7 +854,6 @@ function addEntity(o) {
     if (!o.onWall) sealDoorway(o.x, o.z, o.w || 2.4, o.y || 0, FACILITY.ceil, FACILITY.z0, FACILITY.z1);
   }
   else if (o.t === 'crusher') e = new Crusher(o);
-  else if (o.t === 'elevator') e = new Elevator(o);
   else if (o.t === 'laser') e = new Laser(o);
   else if (o.t === 'keepsake') e = new Keepsake(o);
   else if (o.t === 'ability') e = new AbilityPickup(o);
@@ -791,15 +861,244 @@ function addEntity(o) {
 }
 
 function decorateFacility() {
+  const PI = Math.PI, H = PI / 2;
+
+  // Helper: place a wall panel with Y-scale compressed to fit 4-unit ceiling
+  function wallPanel(name, x, y, z, rotY) {
+    const p = spawnProp(name, x, y, z, 1, rotY);
+    if (p) p.scale.set(1, 0.74, 1); // 5.43 * 0.74 ≈ 4.0 to match ceiling
+  }
+  const wallTypes = ['sm-wall1', 'sm-wall2', 'sm-window', 'sm-door-wall'];
+  function pickWall(i) { return wallTypes[((i * 7 + 3) % 4)]; }
+
+  // ─── South-wall panels (z ≈ -5.8, facing north) — full length ───
+  for (let x = -2; x < 58; x += 4) {
+    wallPanel(pickWall(x), x, 0, -5.8, 0);
+  }
+  // ─── North-wall panels (z ≈ 17.8, facing south) — full length ───
+  for (let x = 0; x < 58; x += 4) {
+    wallPanel(pickWall(x + 1), x, 0, 17.8, PI);
+  }
+  // ─── West-wall panels (x ≈ -1.8, facing east) ───
+  for (let z = -6; z < 18; z += 4) {
+    wallPanel(pickWall(z + 10), -1.8, 0, z, H);
+  }
+  // ─── East-wall panels (x ≈ 57.8, facing west) ───
+  for (let z = -6; z < 18; z += 4) {
+    wallPanel(pickWall(z + 20), 57.8, 0, z, -H);
+  }
+
+  // ─── Overhead piping & vents along south ceiling — full length ───
+  for (let x = 0; x < 58; x += 3) {
+    const r = (x * 13 + 7) % 7;
+    if (r < 2) spawnProp('sm-pipes', x, 2.6, -5.5, 1.2, 0);
+    else if (r < 3) spawnProp('sm-pipes-sm', x, 2.8, -5.5, 1.5, 0);
+    else if (r < 4) spawnProp('sm-vent', x, 2.2, -5.5, 2, 0);
+    else if (r < 5) spawnProp('sm-vent2', x, 2.4, -5.5, 2, 0);
+    else if (r < 6) spawnProp('sm-plate', x, 1.8, -5.5, 2.2, 0);
+    else spawnProp('sm-output', x, 1.6, -5.5, 2.8, 0);
+  }
+  // ─── Overhead along north ceiling — full length ───
+  for (let x = 1; x < 58; x += 4) {
+    const r = (x * 17 + 2) % 5;
+    if (r < 2) spawnProp('sm-pipes-sm', x, 2.9, 17.5, 1.4, PI);
+    else if (r < 3) spawnProp('sm-vent2', x, 2.3, 17.5, 2, PI);
+    else if (r < 4) spawnProp('sm-pipes', x, 2.7, 17.5, 1.3, PI);
+    else spawnProp('sm-plate-sm', x, 2.0, 17.5, 2.5, PI);
+  }
+
+  // ─── Internal wall decorations (on divider walls) ───
+  // Wall at x=14.5 (between Sector I & II)
+  spawnProp('sm-door-wall', 14.5, 0, -4.5, 0.9, H);
+  spawnProp('sm-hexagon', 14.5, 1.6, -1, 2.5, H);
+  spawnProp('sm-plate', 14.5, 1.4, 8, 2, H);
+  spawnProp('sm-output', 14.5, 1.8, 14, 2.5, H);
+  // Wall at x=30.5 (between Sector II & III, door d2 gap z=4–8)
+  spawnProp('sm-door-wall', 30.5, 0, -3, 0.9, -H);
+  spawnProp('sm-hexagon', 30.5, 1.5, 1, 2.5, -H);
+  spawnProp('sm-plate', 30.5, 1.3, 12, 2, -H);
+  spawnProp('sm-output', 30.5, 1.7, 15, 2.5, -H);
+  // Wall at x=44.5 (between Sector III & IV, door d3 gap z=6–10)
+  spawnProp('sm-door-wall', 44.5, 0, -4, 0.9, H);
+  spawnProp('sm-hexagon', 44.5, 1.5, -2, 2.5, H);
+  spawnProp('sm-plate', 44.5, 1.3, 2, 2, H);
+  spawnProp('sm-plate-sm', 44.5, 1.4, 12, 2, -H);
+  spawnProp('sm-hexagon', 44.5, 1.6, 14, 2.5, -H);
+  spawnProp('sm-door-wall', 44.5, 0, 16, 0.9, -H);
+  // Wall at x=50 (inner Sector IV, door g1 gap z=4.5–7.5)
+  spawnProp('sm-door-wall', 50, 0, -3, 0.9, -H);
+  spawnProp('sm-hexagon', 50, 1.5, -1, 2.5, -H);
+  spawnProp('sm-plate', 50, 1.3, 2, 2, H);
+  spawnProp('sm-output', 50, 1.7, 10, 2.5, -H);
+  spawnProp('sm-plate-sm', 50, 1.6, 13, 2, H);
+  spawnProp('sm-hexagon', 50, 1.5, 15, 2.5, H);
+  spawnProp('sm-door-wall', 50, 0, 16, 0.9, -H);
+  // Wall at x=52 (g2 gate divider, door g2 gap z=10.8–13.2)
+  spawnProp('sm-hexagon', 52, 1.5, -2, 2.5, H);
+  spawnProp('sm-plate', 52, 1.3, 4, 2, H);
+  spawnProp('sm-output', 52, 1.7, 8, 2.5, -H);
+  spawnProp('sm-door-wall', 52, 0, -4, 0.9, H);
+  spawnProp('sm-plate-sm', 52, 1.5, 15, 2, -H);
+
+  // ════════════ SECTOR I — INTAKE (x: -2 → 14.5) ════════════
+  // Floor props — crate stack near entrance
+  spawnProp('sm-crate', 0, 0, -3, 1.2, 0.3);
+  spawnProp('sm-crate', 0.9, 0, -4, 1, -0.2);
+  spawnProp('sm-crate-long', 1, 0.8, -3.3, 1, 0.5);
+  spawnProp('sm-crate', 1.5, 0, -2, 1, 1.1);
+  spawnProp('sm-container', 0.5, 0, -1.5, 0.9, 0.4);
+  // Storage shelves
+  spawnProp('sm-shelf-tall', 12, 0, -4, 0.8, PI);
+  spawnProp('sm-shelf', 12, 0, 16, 0.7, 0);
+  spawnProp('sm-shelf-tall', 0, 0, 16, 0.7, -H);
+  // Lab equipment
   spawnProp('lab-extinguisher', 4, 0, -4.5, 1, 0.4);
-  spawnProp('lab-cabinet', 18, 0, 12.6, 1, Math.PI);
+  spawnProp('lab-cabinet', -0.5, 0, 8, 1, H);
+  // Computers & tech
+  spawnProp('sm-computer-sm', 11, 0, 6, 0.7, PI * 0.7);
+  spawnProp('sm-computer', 5, 0, 15, 0.7, PI);
+  spawnProp('sm-base', 9, 0, 14, 0.8, 0.3);
+  // Structural
+  spawnProp('sm-column', 6, 0, 8, 0.6, 0);
+  spawnProp('sm-column-slim', 2, 0, 12, 0.6, 0);
+  spawnProp('sm-column-slim', 10, 0, 0, 0.6, 0);
+  // Scatter
+  spawnProp('sm-container', 8, 0, -3.5, 1, 0.8);
+  spawnProp('sm-crate-long', 7, 0, 16, 0.9, 0.6);
+  spawnProp('sm-vessel', 3, 0, 6, 1.2, 0.5);
+  spawnProp('sm-base', 12, 0, 10, 0.7, 1.2);
+  spawnProp('sm-laser', 10, 0, -3, 0.6, 0.9);
+
+  // ════════════ SECTOR II — SORTING LAB (x: 14.5 → 30.5) ════════════
+  // Lab benches / tables
+  spawnProp('lab-cabinet', 18, 0, 12.6, 1, PI);
   spawnProp('lab-magnifier', 17.3, 0.75, 12.3, 1, 0.2);
+  spawnProp('lab-cabinet', 28, 0, -4, 1, 0);
+  // Computers
+  spawnProp('sm-computer', 20, 0, 15.5, 0.8, PI);
+  spawnProp('sm-computer', 16, 0, -4, 0.7, 0);
+  spawnProp('sm-computer-sm', 24, 0, 15.5, 0.7, PI);
+  spawnProp('sm-computer-sm', 29, 0, 3, 0.7, -H);
+  // Capsule & science
+  spawnProp('sm-capsule', 27, 0, 15, 0.9, 0.5);
+  spawnProp('sm-capsule', 17, 0, 0, 0.8, -0.3);
+  spawnProp('sm-vessel', 22, 0.84, 10.8, 1.5, 0);
+  spawnProp('sm-pod', 29, 0, 13, 0.5, 0.8);
+  // Shelves & storage
+  spawnProp('sm-shelf', 18, 0, -4, 0.7, 0);
+  spawnProp('sm-shelf-tall', 16, 0, 16, 0.7, PI);
+  spawnProp('sm-crate', 25, 0, -3, 1, 0.7);
+  spawnProp('sm-crate', 19, 0, -3, 0.9, -0.4);
+  spawnProp('sm-crate-long', 21, 0, -4, 1, 0.2);
+  spawnProp('sm-container', 28, 0, 16, 0.9, PI * 0.6);
+  // Structural
+  spawnProp('sm-column-slim', 20, 0, 8, 0.6, 0);
+  spawnProp('sm-column-slim', 26, 0, 0, 0.6, 0);
+  spawnProp('sm-column', 22, 0, 4, 0.6, 0);
+  spawnProp('sm-column2', 28, 0, 8, 0.6, 0);
+  // Scatter
+  spawnProp('sm-base', 25, 0, 6, 0.8, 1.5);
+  spawnProp('sm-laser', 23, 0, -4, 0.5, 0.3);
+  spawnProp('sm-statue', 17, 0, 6, 0.5, PI * 0.7);
+
+  // ════════════ SECTOR III — PRESS ROOM (x: 31.5 → 44) ════════════
+  // Walls: west x=30.5–30.9, east x=44.5–44.9
+  // Door d3 at (44.5, z=8) gap z=6–10
+  // ── South-wall props (against z ≈ -5) ──
+  spawnProp('sm-crate-long', 33, 0, -3, 1.1, 0.1);
+  spawnProp('sm-crate', 34, 0, -4.5, 1, 0.6);
+  spawnProp('sm-crate', 32.5, 0, -4, 0.9, -0.5);
+  spawnProp('sm-crate-long', 40, 0, -3, 1, 0.8);
+  spawnProp('sm-shelf-tall', 32, 0, -4, 0.7, 0);
+  spawnProp('sm-shelf', 43, 0, -4, 0.7, 0);
+  spawnProp('sm-shelf', 37, 0, -4.5, 0.7, 0);
+  spawnProp('lab-extinguisher', 43, 0, -4.5, 1, -0.3);
+  // ── North-wall props (against z ≈ 17) ──
+  spawnProp('sm-container', 33, 0, 16, 0.9, PI * 0.4);
+  spawnProp('sm-container', 40, 0, 15, 1, PI * 0.8);
+  spawnProp('sm-shelf-tall', 36, 0, 16, 0.7, PI);
+  spawnProp('sm-vessel', 35, 0, 15, 1.3, PI);
+  spawnProp('sm-capsule', 43, 0, 15, 0.7, -0.4);
+  spawnProp('sm-crate-long', 32, 0, 16, 0.9, PI * 0.3);
+  spawnProp('sm-computer', 42, 0, 16, 0.7, PI);
+  // ── West-wall side (against x ≈ 31.5, clear of wall 30.5–30.9) ──
+  spawnProp('sm-capsule', 32, 0, 14, 0.8, 0.6);
+  spawnProp('sm-computer-sm', 32, 0, 0, 0.7, H);
+  spawnProp('sm-crate', 32, 0, -2, 0.9, 0.4);
+  // ── East-wall side (against x ≈ 43, clear of wall 44.5–44.9) ──
+  spawnProp('sm-shelf-tall', 43, 0, 0, 0.7, -H);
+  spawnProp('sm-computer-sm', 43, 0, 12, 0.7, -H);
+  spawnProp('sm-pod', 42, 0, -3, 0.6, 0);
+  // ── Central area ──
   spawnProp('lab-glasses', 34.4, 0, 3.2, 1, 0);
   spawnProp('lab-gloves', 33.6, 0, 3.6, 1, 0.5);
-  spawnProp('lab-counter', 48.5, 0, 3.5, 1, Math.PI / 2);
+  spawnProp('sm-computer', 36, 0, 14, 0.7, PI * 0.3);
+  spawnProp('sm-computer-sm', 41, 0, 3, 0.7, H);
+  spawnProp('sm-base', 36, 0, 1, 0.7, 0.8);
+  spawnProp('sm-base', 39, 0, 10, 0.7, 1.4);
+  spawnProp('sm-laser', 39, 0, 13, 0.5, PI * 0.6);
+  spawnProp('sm-laser', 33, 0, 10, 0.5, 0.3);
+  // Structural
+  spawnProp('sm-column2', 34, 0, 12, 0.6, 0);
+  spawnProp('sm-column2', 42, 0, 12, 0.6, 0);
+  spawnProp('sm-column', 37, 0, 0, 0.6, 0);
+  spawnProp('sm-column-slim', 33, 0, 4, 0.6, 0);
+  spawnProp('sm-column-slim', 40, 0, 0, 0.6, 0);
+  spawnProp('sm-column', 35, 0, 8, 0.6, 0);
+  spawnProp('sm-statue', 38, 0, 0, 0.6, PI * 0.3);
+
+  // ════════════ SECTOR IV — OBSERVATION (x: 45.5 → 57) ════════════
+  // Walls: west x=44.5–44.9, inner x=50–50.4, inner x=52–52.4, east x=58
+  // Doors: g1(50, z6) gap z=4.5–7.5, g2(52, z12) gap z=10.8–13.2, g3(58, z14) gap z=12.8–15.2
+  // ── South-wall props (against z ≈ -5) ──
+  spawnProp('sm-crate', 46, 0, -3, 1, 0.5);
+  spawnProp('sm-crate', 47, 0, -4, 0.9, -0.7);
+  spawnProp('sm-crate-long', 54, 0, -3, 1, 0.2);
+  spawnProp('sm-shelf-tall', 48, 0, -4, 0.7, 0);
+  spawnProp('sm-shelf', 55, 0, -4, 0.7, 0);
+  spawnProp('sm-vessel', 49, 0, -3, 1.2, 0.3);
+  spawnProp('sm-computer-sm', 46, 0, -4.5, 0.7, 0);
+  // ── North-wall props (against z ≈ 17) ──
+  spawnProp('sm-container', 46, 0, 16, 0.9, PI * 0.7);
+  spawnProp('sm-container', 56, 0, 16, 0.8, PI * 0.3);
+  spawnProp('sm-shelf-tall', 55, 0, 16, 0.7, PI);
+  spawnProp('sm-shelf-tall', 53.5, 0, 16, 0.7, PI);
+  spawnProp('sm-computer-sm', 47, 0, 15.5, 0.7, PI);
+  spawnProp('sm-computer', 56, 0, 15, 0.7, PI);
+  spawnProp('sm-crate-long', 49, 0, 16, 0.9, PI * 0.5);
+  spawnProp('sm-capsule', 54, 0, 16, 0.7, PI * 0.8);
+  // ── West-wall side (against x ≈ 46, clear of wall 44.5–44.9) ──
+  spawnProp('sm-capsule', 46, 0, 4, 0.7, H);
+  spawnProp('sm-computer-sm', 46, 0, 12, 0.7, H);
+  spawnProp('sm-crate', 46, 0, 0, 0.9, 0.3);
+  // ── East-wall side (against x ≈ 57, clear of building wall at 58) ──
+  spawnProp('sm-shelf', 57, 0, 6, 0.7, -H);
+  spawnProp('sm-shelf-tall', 57, 0, 2, 0.7, -H);
+  spawnProp('sm-computer', 57, 0, 10, 0.7, -H);
+  spawnProp('sm-crate-long', 57, 0, -3, 0.9, -0.2);
+  // ── Sub-area A (x: 45.5–49.5, between wall 44.5 and wall 50) ──
+  spawnProp('lab-counter', 48.5, 0, 3.5, 1, H);
   spawnProp('scifi-computer', 48.85, 0.7, 3.2, 1, 0.3);
-  spawnProp('scifi-access', 52, 0, 2, 1, -0.6);
-  spawnProp('scifi-chest', 51, 0, 0, 1, 0.2);
+  spawnProp('sm-pod', 47, 0, 0, 0.5, 0.4);
+  spawnProp('sm-base', 47, 0, 8, 0.7, 0.6);
+  spawnProp('sm-capsule', 48, 0, 14, 0.8, 0.3);
+  spawnProp('sm-column', 48, 0, 10, 0.6, 0);
+  spawnProp('sm-column-slim', 46, 0, 8, 0.6, 0);
+  // ── Sub-area B (x: 50.5–51.5, narrow corridor between walls 50 and 52) ──
+  spawnProp('sm-laser', 51, 0, 3, 0.4, 0.8);
+  spawnProp('sm-base', 51, 0, -2, 0.5, 1.0);
+  // ── Sub-area C (x: 53–57, between wall 52 and east wall 58) ──
+  spawnProp('scifi-access', 53.5, 0, 2, 1, -0.6);
+  spawnProp('scifi-chest', 53, 0, 0, 1, 0.2);
+  spawnProp('sm-computer', 54, 0, 4, 0.7, PI * 0.4);
+  spawnProp('sm-capsule', 56, 0, 8, 0.7, -0.6);
+  spawnProp('sm-pod', 54, 0, 12, 0.5, 1.2);
+  spawnProp('sm-statue', 55, 0, 0, 0.5, PI * 0.5);
+  spawnProp('sm-base', 54, 0, 8, 0.7, 1.0);
+  spawnProp('sm-laser', 56, 0, 3, 0.5, -H);
+  spawnProp('sm-column', 54, 0, 10, 0.6, 0);
+  spawnProp('sm-column-slim', 56, 0, 4, 0.6, 0);
+  spawnProp('sm-column', 56, 0, 16, 0.6, 0);
 }
 
 function buildFacility() {
@@ -810,20 +1109,21 @@ function buildFacility() {
   wallSolid(b.x0 - WT, 0, b.z0 - WT, b.x1 - b.x0 + WT * 2, c, WT);
   wallSolid(b.x0 - WT, 0, b.z1, b.x1 - b.x0 + WT * 2, c, WT);
   wallSolid(b.x0 - WT, 0, b.z0 - WT, WT, c, b.z1 - b.z0 + WT * 2);
-  wallSolid(b.x1, 0, b.z0 - WT, WT, c, b.z1 - b.z0 + WT * 2);
+  // East wall split for final door g3 at z≈14 (gap 12.8→15.2)
+  wallSolid(b.x1, 0, b.z0 - WT, WT, c, 12.8 - (b.z0 - WT));
+  wallSolid(b.x1, 0, 15.2, WT, c, (b.z1 + WT) - 15.2);
 
   internalWall(14.5, b.z0, b.z1, 2, 5, c);
   internalWall(30.5, b.z0, b.z1, 4, 8, c);
-  internalWall(40, b.z0, b.z1, 6, 10, c);
   internalWall(44.5, b.z0, b.z1, 6, 10, c);
   internalWall(50, b.z0, b.z1, 4.5, 7.5, c);
+  internalWall(52, b.z0, b.z1, 10.8, 13.2, c);
 
 
   for (const s of [
     [6, 0, -4, 1.5, 1.3, 1.5, 'crate'], [10, 0, 5, 1.4, 1.0, 1.4, 'rust'],
     [22, 0, 9, 3, 0.42, 3, 'step'], [22.6, 0.42, 9.6, 1.8, 0.42, 1.8, 'step'],
     [34.5, 0, 7, 0.6, 0.42, 4, 'step'], [39.4, 0, 7, 0.6, 0.42, 4, 'step'],
-    [52, 0, 4, 0.5, 3.0, 0.5, 'steelDark'],
   ]) addStair(s);
 
   const objects = [
@@ -850,15 +1150,13 @@ function buildFacility() {
     { t: 'keepsake', x: 34, z: 13, item: 'letter', timer: 3, text: 'A letter you never posted.<br><span style="opacity:.55">The handwriting is steadier than you remember.</span>' },
     { t: 'keepsake', x: 42, z: 12, item: 'circuit', timer: 5, text: 'A circuit board, scorched at one corner.<br><span style="opacity:.55">It still conducts.</span>' },
 
-    { t: 'button', id: 'pwr', x: 47, z: 2, mode: 'latch' },
     { t: 'plate', id: 'pGate', x: 48, z: 6, w: 2.4 },
     { t: 'door', id: 'g1', x: 50, z: 6, w: 2.8, req: ['pGate'], onWall: true },
-    { t: 'elevator', id: 'lift', x: 50, z: 9, w: 3.0, d: 2.6, top: 2.4, req: 'pwr' },
     { t: 'button', id: 'bDoor', x: 48, z: 14, mode: 'pulse' },
-    { t: 'door', id: 'g2', x: 52, z: 12, w: 2.4, req: ['bDoor'], timed: 9 },
-    { t: 'plate', id: 'pFinal', x: 54, z: 14, w: 2.4 },
-    { t: 'door', id: 'g3', x: 55, z: 14, w: 2.4, req: ['pFinal'] },
-    { t: 'keepsake', x: 55, z: 12, item: 'drawing', timer: 3, text: 'A drawing, in crayon.<br><span style="opacity:.55">Two figures. One of them is much taller.</span>' },
+    { t: 'door', id: 'g2', x: 52, z: 12, w: 2.4, req: ['bDoor'], timed: 9, onWall: true },
+    { t: 'plate', id: 'pFinal', x: 56, z: 14, w: 2.4 },
+    { t: 'door', id: 'g3', x: 58, z: 14, w: 2.4, req: ['pFinal'], onWall: true },
+    { t: 'keepsake', x: 56, z: 12, item: 'drawing', timer: 3, text: 'A drawing, in crayon.<br><span style="opacity:.55">Two figures. One of them is much taller.</span>' },
   ];
   for (const o of objects) addEntity(o);
 
@@ -879,8 +1177,8 @@ function buildFacility() {
     { x: 35, z: 4, text: 'HYDRAULIC PRESS 3 &mdash; <span style="opacity:.55">interlock disabled for containment test 04/11</span>' },
     { x: 37, z: 11, text: 'Whatever the press keeps, the field keeps.' },
     { x: 41, z: 11, text: 'Whatever holds this one must never let go.' },
-    { x: 47, z: 0, text: 'MAIN BUS &mdash; <span style="opacity:.55">containment floor / observation deck</span>' },
-    { x: 51, z: 8, deck: true, text: 'The field has held for fourteen years.<br><span style="opacity:.55">It has only ever needed the one subject.</span>' },
+    { x: 47, z: 0, text: 'MAIN BUS &mdash; <span style="opacity:.55">containment corridor</span>' },
+    { x: 51, z: 8, text: 'The field has held for fourteen years.<br><span style="opacity:.55">It has only ever needed the one subject.</span>' },
     { x: 54, z: 13, text: 'The door at the end has never been locked.' },
   ].map(f => ({ ...f, seen: false }));
 
@@ -900,14 +1198,6 @@ function groundAt(x, z, curY) {
     if (x <= s.x - PH.R || x >= s.x + s.w + PH.R || z <= s.z - PH.R || z >= s.z + s.d + PH.R) continue;
     const top = s.y + s.h;
     if (top <= curY + STEP_MAX + 0.02) g = Math.max(g, top);
-  }
-  for (let i = 0, n = World.ents.length; i < n; i++) {
-    const e = World.ents[i];
-    if (e.kind !== 'elevator') continue;
-    const f = e.footprint;
-    if (x <= f.x || x >= f.x + f.w || z <= f.z || z >= f.z + f.d) continue;
-    const top = e.y + 0.3;
-    if (Math.abs(top - curY) < 1.0) g = Math.max(g, top);
   }
   return g;
 }
@@ -1066,7 +1356,6 @@ function resetEntities() {
     if (e instanceof Door) { e.open = 0; e.target = 0; e.timer = 0; e.wasReq = false; }
     if (e instanceof Button) { e.latched = false; e.flash = 0; }
     if (e instanceof Plate) { e.on = false; e.depress = 0; }
-    if (e instanceof Elevator) { e.y = 0; }
     if (e instanceof Crusher) { e.y = e.o.top; e.lastK = 0; }
   }
 }
@@ -1081,7 +1370,7 @@ function applyTension() {
   }
   scene.fog.density = BASE_FOG * (1 + 0.12 * n);
   renderer.toneMappingExposure = Math.max(0.88, BASE_EXPOSURE - 0.025 * n);
-  if (World.hemi) World.hemi.intensity = Math.max(0.2, 0.32 - 0.018 * n);
+  if (World.hemi) World.hemi.intensity = Math.max(0.35, 0.55 - 0.018 * n);
   Audio.klaxonLevel(Math.min(0.06, 0.012 * n));
 }
 
@@ -1147,11 +1436,6 @@ function commitDeath() {
   G.state = 'play';
 }
 
-function isPlayerOnDeck() {
-  if (!G.player) return false;
-  return G.player.x > 48 && G.player.x < 54 && G.player.z > 8 && G.player.z < 14 && G.player.y > 1.5;
-}
-
 function checkZoneEntry(silent) {
   if (!G.player) return;
   for (const z of ZONES) {
@@ -1215,7 +1499,6 @@ function stepSim(dt) {
   for (const e of World.ents) {
     if (e instanceof Plate) e.trigger(allActors);
     else if (e instanceof Button) e.trigger(allActors);
-    else if (e instanceof Elevator) e.logic(dt, allActors);
     else if (e instanceof Crusher) e.logic(dt, G.tick);
     else if (e instanceof Laser) e.logic();
   }
@@ -1236,8 +1519,6 @@ function stepSim(dt) {
 
   for (const f of World.frags) {
     if (f.seen) continue;
-    if (f.deck && !isPlayerOnDeck()) continue;
-    if (!f.deck && isPlayerOnDeck() && f.x < 46) continue;
     if (Math.hypot(G.player.x - f.x, G.player.z - f.z) < 1.8) { f.seen = true; showFrag(f.text); }
   }
 
@@ -1455,7 +1736,7 @@ function frame(now) {
 }
 
 (async () => {
-  await loadProps();
+  await Promise.all([loadProps(), loadCharacterAssets()]);
   buildFacility();
   camTarget.set(SPAWN.x, 1, SPAWN.z);
   camPos.copy(camTarget).addScaledVector(CAM_DIR, ISO.dist);
