@@ -17,6 +17,7 @@ const URL_PARAMS = new URLSearchParams(location.search);
 const DEV_AUTO = URL_PARAMS.has('auto');
 const DEV_DEBUG = URL_PARAMS.has('debug');
 const DEV_GHOSTS = parseInt(URL_PARAMS.get('ghosts') || '0', 10) || 0;
+const DEV_SKIP_INTRO = URL_PARAMS.has('skipintro');
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -1738,6 +1739,45 @@ function startEnding() {
   setTimeout(() => { $('#e1').classList.remove('on'); $('#etitle').classList.add('on'); }, 14500);
 }
 
+function beginFromMenu() {
+  UI.menu.classList.remove('on');
+  G.state = 'cutscene';
+  setFade(0);
+  if (Audio.ok) Audio.ambientLevel(0);
+  const play = (typeof playIntroCutscene === 'function') ? playIntroCutscene : (cb) => cb && cb();
+  if (DEV_SKIP_INTRO) { startGame(); return; }
+  play(startGame, getIntroBridge());
+}
+
+function getIntroBridge() {
+  return {
+    THREE, scene, camera, renderer, World, G, PAL, M, GEO, ISO, CAM_DIR, SPAWN,
+    buildFigure, poseFigure, box, UI, Audio, setFade,
+    lookAt(x, y, z, distScale, dt) {
+      const targetDist = ISO.dist * (distScale == null ? 1 : distScale);
+      if (dt == null) {
+        camTarget.set(x, y, z);
+        camPos.copy(camTarget).addScaledVector(CAM_DIR, targetDist);
+      } else {
+        camTarget.x = damp(camTarget.x, x, 7, dt);
+        camTarget.y = damp(camTarget.y, y, 7, dt);
+        camTarget.z = damp(camTarget.z, z, 7, dt);
+        const cur = camera.position.distanceTo(camTarget);
+        const dist = damp(cur, targetDist, 5, dt);
+        camPos.copy(camTarget).addScaledVector(CAM_DIR, dist);
+      }
+      if (G.shake > 0) {
+        const s = G.shake * 0.18;
+        camPos.x += (Math.random() - 0.5) * s;
+        camPos.y += (Math.random() - 0.5) * s;
+      }
+      camera.position.copy(camPos);
+      camera.lookAt(camTarget);
+      G.shake = Math.max(0, G.shake - (dt || 0.016) * 1.6);
+    },
+  };
+}
+
 function startGame() {
   UI.menu.classList.remove('on');
   buildFacility();
@@ -1756,7 +1796,9 @@ function startGame() {
     setTimeout(() => UI.hint.classList.remove('on'), 8000);
   }
   UI.hud.hidden = false;
-  Audio.S.reveal(); setFade(0);
+  Audio.S.reveal();
+  Audio.ambientLevel(0.5);
+  setFade(0);
 }
 
 function fullRestart() {
@@ -1785,7 +1827,9 @@ function frame(now) {
   }
 
   if (G.state === 'menu') {
-    for (const k in Pressed) if (Pressed[k]) { Pressed[k] = false; startGame(); break; }
+    for (const k in Pressed) if (Pressed[k]) { Pressed[k] = false; beginFromMenu(); break; }
+  } else if (G.state === 'cutscene') {
+    if (typeof IntroCutscene !== 'undefined' && IntroCutscene.update) IntroCutscene.update(dt);
   } else if (G.state === 'intro') {
     G.timers.intro += dt;
     if (G.timers.intro > 1.2) { UI.card.classList.remove('on'); G.state = 'play'; }
@@ -1815,24 +1859,27 @@ function frame(now) {
   if (G.flashT > 0) { UI.flash.style.opacity = G.flashT; G.flashT = damp(G.flashT, 0, 10, dt); if (G.flashT < 0.01) { G.flashT = 0; UI.flash.style.opacity = 0; } }
   else UI.flash.style.opacity = 0;
 
-  const px = G.player ? G.player.x : 0, pz = G.player ? G.player.z : 0;
+  const focus = (G.state === 'cutscene' && typeof IntroCutscene !== 'undefined' && IntroCutscene.focus)
+    ? IntroCutscene.focus
+    : { x: G.player ? G.player.x : 0, z: G.player ? G.player.z : 0 };
+  const px = focus.x, pz = focus.z;
   for (const e of World.ents) {
     if (e.light) {
       const ex = e.g ? e.g.position.x : e.o.x, ez = e.g ? e.g.position.z : e.o.z;
       const dist2 = (ex - px) * (ex - px) + (ez - pz) * (ez - pz);
-      e._lightCulled = dist2 > 225;
+      e._lightCulled = G.state !== 'cutscene' && dist2 > 225;
       if (e._lightCulled) { e.light.intensity = 0; }
     }
-    e.render(dt);
+    if (G.state !== 'cutscene') e.render(dt);
   }
   if (G.player) G.player.render(dt);
   for (const s of G.shadows) if (s.alive) s.render(dt);
 
-  if (G.player && World.keyLight) {
+  if (G.state !== 'cutscene' && G.player && World.keyLight) {
     World.keyLight.position.set(px, 3.5, pz);
     World.fillLight.position.set(px - 4, 2.5, pz + 3);
   }
-  if (G.tick % 3 === 0) {
+  if (G.state !== 'cutscene' && G.tick % 3 === 0) {
     const tNow = now * 0.001;
     for (const l of World.lamps) {
       const dx = l.g.position.x - px, dz = l.g.position.z - pz;
@@ -1872,7 +1919,7 @@ function frame(now) {
   camera.position.copy(camPos); camera.lookAt(camTarget);
   setFade(0);
   UI.loading.style.display = 'none';
-  if (DEV_AUTO) startGame();
+  if (DEV_AUTO) beginFromMenu();
   requestAnimationFrame(frame);
   loadProps(false).then(() => decorateFacility());
 })();
