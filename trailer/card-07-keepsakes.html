@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHADOW — Card 07 · The Keepsakes</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .keepsake-list {
+      list-style: none;
+      padding: 0;
+      text-align: left;
+      display: inline-block;
+    }
+    .keepsake-list li {
+      font-family: var(--sans);
+      font-size: clamp(0.9rem, 1.6vw, 1.6rem);
+      font-weight: 400;
+      color: var(--warm);
+      margin-bottom: 0.5em;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards;
+      padding-left: 1.2em;
+      position: relative;
+    }
+    .keepsake-list li::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--dim);
+    }
+    .keepsake-list li:nth-child(1) { animation-delay: 2.4s; }
+    .keepsake-list li:nth-child(2) { animation-delay: 2.9s; }
+    .keepsake-list li:nth-child(3) { animation-delay: 3.4s; }
+    .keepsake-list li:nth-child(4) { animation-delay: 3.9s; }
+    .keepsake-list li:nth-child(5) { animation-delay: 4.4s; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <p class="line line-main d0">He walked in that morning<br>with his pockets full.</p>
+
+  <p class="line line-sub d1">The field has been stripping them off him,<br>one cycle at a time.</p>
+
+  <div class="sep d2"></div>
+
+  <ul class="keepsake-list">
+    <li>A watch, stopped at 09:41</li>
+    <li>A photograph, face down</li>
+    <li>A house key, worn smooth</li>
+    <li>A letter he never posted</li>
+    <li>A drawing his daughter did at the kitchen table</li>
+  </ul>
+
+  <div class="sep d8"></div>
+
+  <p class="line line-sub d9">Picking one up puts a piece of him back.</p>
+
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+  <span class="card-tag">card 07 · the keepsakes</span>
+</div>
+</body>
+</html>

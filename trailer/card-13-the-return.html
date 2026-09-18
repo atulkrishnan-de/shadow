@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHADOW — Card 13 · The Return</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .counter {
+      font-family: var(--mono);
+      font-size: clamp(1.8rem, 3.5vw, 3.5rem);
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: 0.12em;
+      text-shadow: 0 0 30px rgba(179,136,255,0.4);
+      opacity: 0;
+      animation: fadeUp 1s ease forwards;
+      animation-delay: 3.0s;
+    }
+    .counter .burned {
+      color: rgba(179,136,255,0.15);
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <p class="line line-main d0">The anomaly reaches for<br>what it has already had hold of.</p>
+
+  <p class="line line-sub d1">It does not drag him. It does not trap him.</p>
+  <p class="line line-sub d2">It puts him on the threshold — every time.</p>
+
+  <div class="sep d3"></div>
+
+  <p class="counter d4">1,4<span class="burned">——</span></p>
+  <p class="line line-mono d5">digits burned out</p>
+
+  <div class="sep d6"></div>
+
+  <p class="line line-main d7">And every time, he goes in.</p>
+
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+  <span class="card-tag">card 13 · the return</span>
+</div>
+</body>
+</html>

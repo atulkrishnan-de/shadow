@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHADOW — Card 05 · The Loop</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .timer {
+      font-family: var(--mono);
+      font-size: clamp(2rem, 4vw, 4rem);
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      animation: fadeUp 1s ease forwards, timerPulse 1.6s ease-in-out infinite;
+      animation-delay: 3.6s, 4.6s;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <p class="line line-main d0">The clock runs.</p>
+  <p class="line line-main d1">When it reaches zero, the field resets.</p>
+
+  <div class="sep d2"></div>
+
+  <p class="line line-sub d3">Everything you did is still there.</p>
+  <p class="line line-accent d4">Everything you were is still there.</p>
+
+  <div class="sep d5"></div>
+
+  <p class="timer d6">00:00</p>
+
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+  <span class="card-tag">card 05 · the loop</span>
+</div>
+</body>
+</html>
