@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Last Shift — Card 11 · The Workforce</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .shadow-grid {
+      display: flex;
+      gap: 2.4vw;
+      margin: 1.4em 0;
+      opacity: 0;
+      animation: fadeUp 1s ease forwards;
+      animation-delay: 2.4s;
+    }
+    .shadow-fig {
+      width: clamp(28px, 3vw, 48px);
+      height: clamp(56px, 6vw, 96px);
+      background: var(--violet);
+      border-radius: 4px 4px 2px 2px;
+      box-shadow: 0 0 20px rgba(179,136,255,0.5), 0 0 40px rgba(179,136,255,0.2);
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+    }
+    .shadow-fig:nth-child(1) { animation-delay: 2.6s; }
+    .shadow-fig:nth-child(2) { animation-delay: 3.0s; }
+    .shadow-fig:nth-child(3) { animation-delay: 3.4s; }
+    .shadow-fig:nth-child(4) { animation-delay: 3.8s; }
+    .shadow-fig:nth-child(5) { animation-delay: 4.2s; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <p class="line line-main d0">Five iterations.</p>
+  <p class="line line-main d1">None of them aware of the others.</p>
+
+  <div class="sep d2"></div>
+
+  <div class="shadow-grid">
+    <div class="shadow-fig"></div>
+    <div class="shadow-fig"></div>
+    <div class="shadow-fig"></div>
+    <div class="shadow-fig"></div>
+    <div class="shadow-fig"></div>
+  </div>
+
+  <div class="sep d7"></div>
+
+  <p class="line line-sub d8">A workforce that costs one wage.</p>
+  <p class="line line-accent d9">The room is at its darkest —<br>they are the only light left.</p>
+
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+  <span class="card-tag">card 11 · the workforce</span>
+</div>
+</body>
+</html>

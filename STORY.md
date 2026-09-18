@@ -1,4 +1,4 @@
-# SHADOW
+# The Last Shift
 
 *He is not haunting the building. The building is still using him.*
 
@@ -297,4 +297,4 @@ out. And the understanding that the door was never the puzzle.
 >
 > ## EVERYTHING OUT THERE HAS.
 
-**SHADOW**
+**THE LAST SHIFT**
