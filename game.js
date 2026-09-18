@@ -750,9 +750,9 @@ class Door {
     this.slabGroup = new THREE.Group(); g.add(this.slabGroup);
     if (panelBase) {
       const panel = panelBase.clone();
-      const pScaleX = dw / 0.241;
+      const pScaleX = dw / 2.106; // model's real combined width (trim strip + body), not the 0.241 trim-only sub-piece
       const pScaleY = dh / 4.049;
-      panel.scale.set(pScaleX, pScaleY, dw * 20);
+      panel.scale.set(pScaleX, pScaleY, pScaleX);
       panel.rotation.y = Math.PI / 2;
       panel.position.set(0, 0, -dw / 2);
       this.slabGroup.add(panel);
