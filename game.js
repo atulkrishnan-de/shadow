@@ -242,20 +242,45 @@ const Audio = (() => {
   return { unlock, S, ambientLevel, klaxonLevel, anchorLevel, duck, startBGM, bgmLevel, get ok() { return ready; } };
 })();
 
-const BASE_FOG = 0.032, BASE_EXPOSURE = 0.95;
+const BASE_FOG = 0.032, BASE_EXPOSURE = 1.0;
 const renderer = new THREE.WebGLRenderer({ antialias: window.devicePixelRatio < 2, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = BASE_EXPOSURE;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0c1e);
 scene.fog = new THREE.FogExp2(0x101530, BASE_FOG);
+
+// Faint procedural IBL — applied only to specific metal materials below (never
+// scene.environment: that would add ambient irradiance to every material in the
+// scene, stacking on top of the hand-tuned hemi/point lights and washing
+// everything out), just enough that steel picks up a soft directional sheen
+// instead of reading as flat matte PBR.
+const ENV_MAP = (function buildEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  const envGeo = new THREE.SphereBufferGeometry(24, 16, 16);
+  const envMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {
+      top: { value: new THREE.Color(0x141a28) },
+      bottom: { value: new THREE.Color(0x020203) },
+    },
+    vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vPos; uniform vec3 top; uniform vec3 bottom;
+      void main(){ float t = clamp(normalize(vPos).y * 0.5 + 0.5, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }`,
+  });
+  envScene.add(new THREE.Mesh(envGeo, envMat));
+  const envRT = pmrem.fromScene(envScene, 0.06);
+  pmrem.dispose();
+  return envRT.texture;
+})();
 
 const ISO = { az: Math.PI * 0.235, elevRad: 1.02, targetElevRad: 1.02, dist: 15, targetDist: 15 };
 const CAM_DIR = new THREE.Vector3();
@@ -267,10 +292,71 @@ function updateCamDir() {
   ).normalize();
 }
 updateCamDir();
-const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 1, 260);
+const BASE_FOV = 34;
+const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 1, 260);
+
+// Fast-forward's screen-space kick: a slight radial pull toward center (zoom-blur,
+// same trick racing/boost games use for a burst of speed), directional chromatic
+// fringing that grows with distance from center, and a cool rim tint — all scaled
+// by uAmt so it's fully off at normal speed and eases in with the camera push-in.
+const SpeedRushShader = {
+  uniforms: { tDiffuse: { value: null }, uAmt: { value: 0 } },
+  vertexShader: `varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uAmt;
+    varying vec2 vUv;
+    void main() {
+      vec2 c = vUv - 0.5;
+      float d = length(c);
+      vec2 dir = d > 0.0001 ? c / d : vec2(0.0);
+      vec3 col = vec3(0.0); float wsum = 0.0;
+      const int N = 6;
+      for (int i = 0; i < N; i++) {
+        float t = float(i) / float(N - 1);
+        float w = 1.0 - t * 0.6;
+        col += texture2D(tDiffuse, vUv - c * (uAmt * 0.09 * t)).rgb * w;
+        wsum += w;
+      }
+      col /= wsum;
+      float ca = uAmt * 0.004 * d;
+      float r = texture2D(tDiffuse, vUv - dir * ca).r;
+      float b = texture2D(tDiffuse, vUv + dir * ca).b;
+      col = vec3(r, col.g, b);
+      col *= mix(1.0, mix(1.0, 0.6, smoothstep(0.2, 0.85, d)), uAmt);
+      col = mix(col, col * vec3(0.86, 0.92, 1.1), uAmt);
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+};
+
+// ── Post-processing: bloom for emissives/lights, a speed-rush pass for
+// fast-forward, FXAA to recover the antialiasing lost by rendering into the
+// composer's offscreen target, gamma pass to convert the linear composite back
+// to sRGB for display (EffectComposer's own passes are raw ShaderMaterials, so
+// they bypass renderer.outputEncoding). ──
+let composer = null, bloomPass = null, speedPass = null, fxaaPass = null;
+function buildComposer() {
+  const dpr = renderer.getPixelRatio();
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.45, 0.85);
+  composer.addPass(bloomPass);
+  speedPass = new THREE.ShaderPass(SpeedRushShader);
+  composer.addPass(speedPass);
+  fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
+  fxaaPass.material.uniforms.resolution.value.set(1 / (innerWidth * dpr), 1 / (innerHeight * dpr));
+  composer.addPass(fxaaPass);
+  const gammaPass = new THREE.ShaderPass(THREE.GammaCorrectionShader);
+  gammaPass.renderToScreen = true;
+  composer.addPass(gammaPass);
+}
+buildComposer();
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  const dpr = renderer.getPixelRatio();
+  fxaaPass.material.uniforms.resolution.value.set(1 / (innerWidth * dpr), 1 / (innerHeight * dpr));
 });
 
 const PAL = {
@@ -358,6 +444,9 @@ M.playerDark = std(0x232a2e, 0.85, 0.05);
 M.keepsake = std(0xd8c39a, 0.55, 0.1, { emissive: 0xffcf94, emissiveIntensity: 0.7 });
 M.ability = std(0x8ae8ff, 0.4, 0.2, { emissive: 0x4fe0ff, emissiveIntensity: 0.9 });
 M.glass = std(0x2a4a4a, 0.3, 0.1, { transparent: true, opacity: 0.4, emissive: 0x18302f, emissiveIntensity: 0.5 });
+// These three read the same scene.environment as everything else, just dialed
+// down from the default intensity of 1 to a more restrained sheen.
+for (const mat of [M.steel, M.steelDark, M.crate]) { mat.envMap = ENV_MAP; mat.envMapIntensity = 0.35; }
 
 function makeShadowMaterial() {
   return new THREE.ShaderMaterial({
@@ -392,17 +481,30 @@ function makeShadowMaterial() {
       uniform vec3 uColor; uniform vec3 uGlow;
       varying vec3 vNormal; varying vec3 vViewDir;
       void main() {
-        float scan = 0.85 + 0.15 * sin(gl_FragCoord.y * 0.6 + uTime * 5.0);
-        float fres = pow(1.0 - max(dot(normalize(vNormal), normalize(vViewDir)), 0.0), 2.0);
+        float scan = 0.94 + 0.06 * sin(gl_FragCoord.y * 0.25 + uTime * 3.0);
+        float fres = pow(1.0 - max(dot(normalize(vNormal), normalize(vViewDir)), 0.0), 1.8);
         vec3 col = mix(uColor, uGlow, fres);
         col = mix(col, vec3(1.0, 0.3, 0.3), uGlitch * 0.4);
-        gl_FragColor = vec4(col * scan, clamp(uOpacity + fres * 0.3, 0.0, 1.0));
+        col = col * scan;
+        gl_FragColor = vec4(col, clamp(uOpacity + fres * 0.25, 0.0, 1.0));
       }`,
   });
 }
 
 const GEO = { box: new THREE.BoxBufferGeometry(1, 1, 1), cyl: new THREE.CylinderBufferGeometry(1, 1, 1, 12) };
 
+// Material families for reskinning the scifi-modular kit's flat R=G=B greys —
+// each grey originally marked a shading role (recess/body/highlight by luminance),
+// so each family supplies a dark/mid/light triplet rather than one flat tint.
+// Hues are pulled from PAL (the game's own accent colors) so decor reads as part
+// of the same world as the Shadows (purple), doors/signals (amber/cyan), etc.
+const SM_TINTS = {
+  steel:  { dark: [0.06, 0.07, 0.10], mid: [0.27, 0.32, 0.40], light: [0.70, 0.77, 0.90] },
+  amber:  { dark: [0.22, 0.13, 0.05], mid: [0.66, 0.42, 0.15], light: [1.00, 0.72, 0.30] },
+  purple: { dark: [0.14, 0.09, 0.26], mid: [0.42, 0.30, 0.85], light: [0.72, 0.64, 1.00], glow: true },
+  cyan:   { dark: [0.04, 0.15, 0.18], mid: [0.10, 0.55, 0.68], light: [0.45, 0.93, 1.00], glow: true },
+  green:  { dark: [0.04, 0.16, 0.10], mid: [0.16, 0.56, 0.36], light: [0.45, 1.00, 0.68] },
+};
 const PROP_DEFS = {
   'lab-counter': { folder: 'lab', scale: 0.01 },
   'lab-cabinet': { folder: 'lab', scale: 0.01 },
@@ -415,23 +517,23 @@ const PROP_DEFS = {
   'scifi-chest': { folder: 'scifi', file: 'Prop_Chest', ext: 'gltf' },
   'door-metal': { folder: 'doors', file: 'Door_Metal', ext: 'gltf' },
   'door-frame': { folder: 'doors', file: 'Door_Frame_A', ext: 'gltf' },
-  'sm-crate': { folder: 'scifi-modular', file: 'Props_Crate' },
-  'sm-crate-long': { folder: 'scifi-modular', file: 'Props_CrateLong' },
-  'sm-computer': { folder: 'scifi-modular', file: 'Props_Computer' },
-  'sm-computer-sm': { folder: 'scifi-modular', file: 'Props_ComputerSmall' },
-  'sm-chest': { folder: 'scifi-modular', file: 'Props_Chest' },
+  'sm-crate': { folder: 'scifi-modular', file: 'Props_Crate', tint: 'amber' },
+  'sm-crate-long': { folder: 'scifi-modular', file: 'Props_CrateLong', tint: 'amber' },
+  'sm-computer': { folder: 'scifi-modular', file: 'Props_Computer', tint: 'cyan' },
+  'sm-computer-sm': { folder: 'scifi-modular', file: 'Props_ComputerSmall', tint: 'cyan' },
+  'sm-chest': { folder: 'scifi-modular', file: 'Props_Chest', tint: 'amber' },
   'sm-shelf': { folder: 'scifi-modular', file: 'Props_Shelf' },
   'sm-shelf-tall': { folder: 'scifi-modular', file: 'Props_Shelf_Tall' },
-  'sm-capsule': { folder: 'scifi-modular', file: 'Props_Capsule' },
-  'sm-pod': { folder: 'scifi-modular', file: 'Props_Pod' },
-  'sm-vessel': { folder: 'scifi-modular', file: 'Props_Vessel' },
-  'sm-container': { folder: 'scifi-modular', file: 'Props_ContainerFull' },
-  'sm-statue': { folder: 'scifi-modular', file: 'Props_Statue' },
+  'sm-capsule': { folder: 'scifi-modular', file: 'Props_Capsule', tint: 'purple' },
+  'sm-pod': { folder: 'scifi-modular', file: 'Props_Pod', tint: 'purple' },
+  'sm-vessel': { folder: 'scifi-modular', file: 'Props_Vessel', tint: 'purple' },
+  'sm-container': { folder: 'scifi-modular', file: 'Props_ContainerFull', tint: 'amber' },
+  'sm-statue': { folder: 'scifi-modular', file: 'Props_Statue', tint: 'purple' },
   'sm-column': { folder: 'scifi-modular', file: 'Column_1' },
   'sm-column2': { folder: 'scifi-modular', file: 'Column_2' },
   'sm-column-slim': { folder: 'scifi-modular', file: 'Column_Slim' },
-  'sm-pipes': { folder: 'scifi-modular', file: 'Pipes' },
-  'sm-vent': { folder: 'scifi-modular', file: 'Details_Vent_1' },
+  'sm-pipes': { folder: 'scifi-modular', file: 'Pipes', tint: 'green' },
+  'sm-vent': { folder: 'scifi-modular', file: 'Details_Vent_1', tint: 'green' },
   'sm-plate': { folder: 'scifi-modular', file: 'Details_Plate_Large' },
   'sm-hexagon': { folder: 'scifi-modular', file: 'Details_Hexagon' },
   'sm-output': { folder: 'scifi-modular', file: 'Details_Output' },
@@ -441,14 +543,42 @@ const PROP_DEFS = {
   'sm-door-single': { folder: 'scifi-modular', file: 'Door_Single' },
   'sm-door-wall': { folder: 'scifi-modular', file: 'DoorSingle_Wall_SideA' },
   'sm-staircase': { folder: 'scifi-modular', file: 'Staircase' },
-  'sm-base': { folder: 'scifi-modular', file: 'Props_Base' },
-  'sm-laser': { folder: 'scifi-modular', file: 'Props_Laser' },
-  'sm-pipes-sm': { folder: 'scifi-modular', file: 'Details_Pipes_Small' },
-  'sm-vent2': { folder: 'scifi-modular', file: 'Details_Vent_2' },
+  'sm-laser': { folder: 'scifi-modular', file: 'Props_Laser', tint: 'cyan' },
+  'sm-pipes-sm': { folder: 'scifi-modular', file: 'Details_Pipes_Small', tint: 'green' },
+  'sm-vent2': { folder: 'scifi-modular', file: 'Details_Vent_2', tint: 'green' },
   'sm-plate-sm': { folder: 'scifi-modular', file: 'Details_Plate_Small' },
 };
 const PROPS = Object.create(null);
 const PROP_PRIORITY = { 'door-metal': 1, 'door-frame': 1 };
+// Recolors a tiny shared palette-strip texture (a handful of flat swatches, one per
+// face/material-role, with transparent padding) by bucketing each opaque swatch's
+// luminance into the same dark/mid/light roles used for flat-color materials, then
+// swapping in this prop's SM_TINTS family. Runs once per loaded prop template (before
+// spawnProp() clones it), since clones share the material/texture by reference.
+function retintPaletteTexture(material, t) {
+  const map = material.map, img = map && map.image;
+  if (!img || !img.width) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width; canvas.height = img.height;
+  const cctx = canvas.getContext('2d');
+  cctx.drawImage(img, 0, 0);
+  const imgData = cctx.getImageData(0, 0, canvas.width, canvas.height);
+  const px = imgData.data;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] === 0) continue; // leave transparent padding alone
+    const lum = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) / 255;
+    const shade = lum < 0.28 ? t.dark : lum < 0.55 ? t.mid : t.light;
+    px[i] = Math.round(shade[0] * 255); px[i + 1] = Math.round(shade[1] * 255); px[i + 2] = Math.round(shade[2] * 255);
+  }
+  cctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = map.flipY; tex.wrapS = map.wrapS; tex.wrapT = map.wrapT;
+  tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; // crisp swatch edges, no bleed
+  tex.needsUpdate = true;
+  material.map = tex;
+  material.color.setRGB(1, 1, 1); // no extra multiplier on top of the recolored swatches
+  material.needsUpdate = true;
+}
 function loadProps(priority) {
   if (typeof THREE.GLTFLoader !== 'function') return Promise.resolve();
   const loader = new THREE.GLTFLoader();
@@ -460,11 +590,36 @@ function loadProps(priority) {
       gltf => {
         gltf.scene.traverse(o => {
           if (o.isMesh) {
-            o.castShadow = false; o.receiveShadow = true;
+            o.castShadow = true; o.receiveShadow = true;
             if (def.mat) { o.material = M[def.mat]; }
             else if (def.folder === 'scifi-modular' && o.material) {
-              const c = o.material.color;
-              if (c) { c.r = Math.min(1, c.r * 2.8 + 0.12); c.g = Math.min(1, c.g * 2.8 + 0.12); c.b = Math.min(1, c.b * 2.8 + 0.12); }
+              const t = SM_TINTS[def.tint] || SM_TINTS.steel;
+              if (o.material.map) {
+                // several props (crates, capsules, computers…) don't use a flat color at
+                // all — they sample a tiny shared palette-strip texture per face, so the
+                // reskin has to recolor that texture's swatches, not material.color.
+                retintPaletteTexture(o.material, t);
+              } else {
+                const c = o.material.color;
+                if (c) {
+                  const isGrey = Math.abs(c.r - c.g) < 0.02 && Math.abs(c.g - c.b) < 0.02;
+                  if (isGrey) {
+                    // the kit's flat greys are R=G=B, so brightening every channel by the same
+                    // factor can only ever produce a lighter grey — reskin with a real per-category
+                    // material family (trim-dark / body-mid / highlight-light) pulled from the
+                    // game's own accent palette instead, keyed by which shading role this grey
+                    // originally represented (recess/body/highlight, by luminance).
+                    const shade = c.r < 0.08 ? t.dark : c.r < 0.28 ? t.mid : t.light;
+                    c.r = shade[0]; c.g = shade[1]; c.b = shade[2];
+                    if (t.glow) {
+                      o.material.emissive.setRGB(shade[0], shade[1], shade[2]);
+                      o.material.emissiveIntensity = 0.35;
+                    }
+                  } else {
+                    c.r = Math.min(1, c.r * 2.8 + 0.12); c.g = Math.min(1, c.g * 2.8 + 0.12); c.b = Math.min(1, c.b * 2.8 + 0.12);
+                  }
+                }
+              }
               o.material.metalness = 0.3; o.material.roughness = 0.6;
             }
           }
@@ -512,7 +667,7 @@ function box(w, h, d, mat, x, y, z, parent) {
   const m = new THREE.Mesh(GEO.box, mat);
   m.scale.set(Math.max(w, 0.001), Math.max(h, 0.001), Math.max(d, 0.001));
   m.position.set(x + w / 2, y + h / 2, z + d / 2);
-  m.castShadow = false; m.receiveShadow = true;
+  m.castShadow = true; m.receiveShadow = true;
   (parent || World.root).add(m);
   return m;
 }
@@ -527,7 +682,7 @@ function loadCrateAsset() {
   if (typeof THREE.FBXLoader !== 'function') return Promise.resolve();
   const loader = new THREE.FBXLoader();
   return new Promise(r => loader.load('assets/box.fbx?v=' + ASSET_V, obj => {
-    obj.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+    obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     CrateCache.model = obj; CrateCache.ready = true;
     console.log('Crate FBX loaded');
     r();
@@ -581,7 +736,7 @@ function buildFigure(isShadow) {
     } else {
       clone.traverse(o => {
         if (o.isMesh || o.isSkinnedMesh) {
-          o.castShadow = false; o.receiveShadow = true;
+          o.castShadow = true; o.receiveShadow = true;
           o.frustumCulled = false;
         }
       });
@@ -1023,10 +1178,15 @@ class AbilityPickup {
 }
 
 function addLighting() {
-  const sun = new THREE.DirectionalLight(0x4466aa, 0.25); sun.position.set(-16, 30, 14); sun.castShadow = true;
-  sun.shadow.mapSize.set(512, 512);
-  const sc = sun.shadow.camera; sc.left = -30; sc.right = 62; sc.top = 22; sc.bottom = -10; sc.near = 1; sc.far = 120;
-  sun.shadow.bias = -0.0015; sun.shadow.normalBias = 0.03;
+  // The facility runs 60 units end to end, so one static shadow frustum spanning
+  // all of it would starve a sane shadow-map resolution. Instead the frustum is a
+  // tight 26x26 window that gets re-centred on the player every frame (see frame()),
+  // so the shadow texel density stays high wherever the player actually is.
+  World.sunOffset = new THREE.Vector3(-16, 30, 14);
+  const sun = new THREE.DirectionalLight(0x6f85c4, 0.4); sun.position.copy(World.sunOffset); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera; sc.left = -13; sc.right = 13; sc.top = 13; sc.bottom = -13; sc.near = 1; sc.far = 60;
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.025; sun.shadow.radius = 2.5;
   World.root.add(sun); World.root.add(sun.target); World.sun = sun;
   World.hemi = new THREE.HemisphereLight(0x1a2248, 0x080810, 0.45); World.root.add(World.hemi);
 
@@ -1169,7 +1329,6 @@ function decorateFacility() {
   // Computers & tech
   spawnProp('sm-computer-sm', 9.5, 0, 6, 0.7, PI * 0.7);
   spawnProp('sm-computer', 5, 0, 15, 0.7, PI);
-  spawnProp('sm-base', 9, 0, 14, 0.8, 0.3);
   // Structural
   spawnProp('sm-column', 6, 0, 8, 0.6, 0);
   spawnProp('sm-column-slim', 2, 0, 12, 0.6, 0);
@@ -1178,7 +1337,6 @@ function decorateFacility() {
   spawnProp('sm-container', 8, 0, -3.5, 1, 0.8);
   spawnProp('sm-crate-long', 7, 0, 16, 0.9, 0.6);
   spawnProp('sm-vessel', 3, 0, 6, 1.2, 0.5);
-  spawnProp('sm-base', 10, 0, 10, 0.7, 1.2);
   spawnProp('sm-laser', 10, 0, -3, 0.6, 0.9);
 
   // ════════════ SECTOR II — SORTING LAB (x: 11 → 30.5) ════════════
@@ -1209,7 +1367,6 @@ function decorateFacility() {
   spawnProp('sm-column', 22, 0, 4, 0.6, 0);
   spawnProp('sm-column2', 28, 0, 8, 0.6, 0);
   // Scatter
-  spawnProp('sm-base', 25, 0, 6, 0.8, 1.5);
   spawnProp('sm-laser', 23, 0, -4, 0.5, 0.3);
   spawnProp('sm-statue', 17, 0, 6, 0.5, PI * 0.7);
 
@@ -1246,8 +1403,6 @@ function decorateFacility() {
   spawnProp('lab-gloves', 33.6, 0, 3.6, 1, 0.5);
   spawnProp('sm-computer', 36, 0, 14, 0.7, PI * 0.3);
   spawnProp('sm-computer-sm', 41, 0, 3, 0.7, H);
-  spawnProp('sm-base', 36, 0, 1, 0.7, 0.8);
-  spawnProp('sm-base', 39, 0, 10, 0.7, 1.4);
   spawnProp('sm-laser', 39, 0, 13, 0.5, PI * 0.6);
   spawnProp('sm-laser', 33, 0, 10, 0.5, 0.3);
   // Structural
@@ -1292,13 +1447,11 @@ function decorateFacility() {
   spawnProp('lab-counter', 48.5, 0, 3.5, 1, H);
   spawnProp('scifi-computer', 48.85, 0.7, 3.2, 1, 0.3);
   spawnProp('sm-pod', 47, 0, 0, 0.5, 0.4);
-  spawnProp('sm-base', 47, 0, 8, 0.7, 0.6);
   spawnProp('sm-capsule', 48, 0, 14, 0.8, 0.3);
   spawnProp('sm-column', 48, 0, 10, 0.6, 0);
   spawnProp('sm-column-slim', 46, 0, 8, 0.6, 0);
   // ── Sub-area B (x: 50.5–51.5, narrow corridor between walls 50 and 52) ──
   spawnProp('sm-laser', 51, 0, 3, 0.4, 0.8);
-  spawnProp('sm-base', 51, 0, -2, 0.5, 1.0);
   // ── Sub-area C (x: 53–57, between wall 52 and east wall 58) ──
   spawnProp('scifi-access', 53.5, 0, 2, 1, -0.6);
   spawnProp('scifi-chest', 53, 0, 0, 1, 0.2);
@@ -1306,7 +1459,6 @@ function decorateFacility() {
   spawnProp('sm-capsule', 56, 0, 8, 0.7, -0.6);
   spawnProp('sm-pod', 54, 0, 12, 0.5, 1.2);
   spawnProp('sm-statue', 55, 0, 0, 0.5, PI * 0.5);
-  spawnProp('sm-base', 54, 0, 8, 0.7, 1.0);
   spawnProp('sm-laser', 56, 0, 3, 0.5, -H);
   spawnProp('sm-column', 54, 0, 10, 0.6, 0);
   spawnProp('sm-column-slim', 56, 0, 4, 0.6, 0);
@@ -1317,7 +1469,7 @@ function buildFacility() {
   if (World.built) return;
   World.built = true;
   const b = FACILITY, c = b.ceil, WT = 0.4;
-  box(b.x1 - b.x0, 0.12, b.z1 - b.z0, M.floor, b.x0, -0.12, b.z0);
+  box(b.x1 - b.x0, 0.12, b.z1 - b.z0, M.floor, b.x0, -0.12, b.z0).castShadow = false;
   wallSolid(b.x0 - WT, 0, b.z0 - WT, b.x1 - b.x0 + WT * 2, c, WT);
   wallSolid(b.x0 - WT, 0, b.z1, b.x1 - b.x0 + WT * 2, c, WT);
   wallSolid(b.x0 - WT, 0, b.z0 - WT, WT, c, b.z1 - b.z0 + WT * 2);
@@ -1538,7 +1690,7 @@ const G = {
   discovered: new Set(),
   zonesSeen: new Set(),
   checkpoint: null,
-  speed: 1, shake: 0, camPull: 0, dev: DEV_DEBUG, timerStarted: false,
+  speed: 1, shake: 0, camPull: 0, ffZoom: 0, dev: DEV_DEBUG, timerStarted: false,
   timers: { intro: 0, death: 0, zoneCard: 0 }, deathCause: '', flashT: 0,
   heart: 0, cue5: false, cue3: false, hintShown: false,
 };
@@ -1826,7 +1978,15 @@ function updateCamera(dt) {
   if (Keys.BracketRight) ISO.targetElevRad = clamp(ISO.targetElevRad - 1.2 * dt, 0.15, 1.45);
   ISO.elevRad = damp(ISO.elevRad, ISO.targetElevRad, 8, dt);
   updateCamDir();
-  const dist = ISO.dist * (1 + pull * 0.12);
+  // Fast-forward reads as a deliberate push-in rather than just "things moving
+  // faster": camera tightens, FOV opens slightly for a rush of speed, eased in
+  // and settled back out — same shape as a boost/dash camera kick in most
+  // contemporary action games, just held for as long as the button is.
+  const ffTarget = G.speed > 1 ? 1 : 0;
+  G.ffZoom = damp(G.ffZoom, ffTarget, ffTarget ? 7 : 4, dt);
+  const dist = ISO.dist * (1 + pull * 0.12) * (1 - G.ffZoom * 0.16);
+  camera.fov = damp(camera.fov, BASE_FOV + G.ffZoom * 6, 6, dt);
+  camera.updateProjectionMatrix();
   const shakeAmt = G.shake * 0.18;
   camPos.copy(camTarget).addScaledVector(CAM_DIR, dist);
   camPos.x += (Math.random() - 0.5) * shakeAmt; camPos.y += (Math.random() - 0.5) * shakeAmt;
@@ -2054,7 +2214,12 @@ function frame(now) {
     World.keyLight.position.set(px, 3.5, pz);
     World.fillLight.position.set(px - 4, 2.5, pz + 3);
   }
-  if (G.state !== 'cutscene' && G.tick % 3 === 0) {
+  if (G.player && World.sun) {
+    World.sun.position.set(px + World.sunOffset.x, World.sunOffset.y, pz + World.sunOffset.z);
+    World.sun.target.position.set(px, 0, pz);
+    World.sun.target.updateMatrixWorld();
+  }
+  if (G.tick % 3 === 0) {
     const tNow = now * 0.001;
     for (const l of World.lamps) {
       const dx = l.g.position.x - px, dz = l.g.position.z - pz;
@@ -2083,7 +2248,8 @@ function frame(now) {
   }
 
   for (const k in Pressed) Pressed[k] = false;
-  renderer.render(scene, camera);
+  speedPass.material.uniforms.uAmt.value = G.ffZoom;
+  composer.render();
 }
 
 (async () => {
