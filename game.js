@@ -11,7 +11,7 @@ const TICK = 1 / 60;
 const STEP_MAX = 0.46;
 const SPAWN = { x: 2, y: 0, z: 3 };
 const MAX_SHADOWS = 12;
-const FACILITY = { x0: -2, x1: 45, z0: -6, z1: 18, ceil: 4 };
+const FACILITY = { x0: -2, x1: 59, z0: -6, z1: 18, ceil: 4 };
 
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEV_AUTO = URL_PARAMS.has('auto');
@@ -2186,7 +2186,7 @@ function frame(now) {
       rig.group.visible = false;
       G.state = 'rewinding';
       G.rewindIdx = G.rec.length - 1;
-      G.rewindSpeed = 16;
+      G.rewindSpeed = 3;
     }
     updateCamera(dt);
   } else if (G.state === 'rewinding') {
@@ -2194,7 +2194,7 @@ function frame(now) {
     for (let i = 0; i < stepsPerFrame && G.rewindIdx > 0; i++) {
       G.rewindIdx--;
     }
-    G.rewindSpeed = Math.min(G.rewindSpeed + dt * 30, 80);
+    G.rewindSpeed = Math.min(G.rewindSpeed + dt * 6, 24);
 
     const frame = G.rec[G.rewindIdx];
     if (frame) {
