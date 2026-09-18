@@ -12,9 +12,93 @@ are boarded here exactly like cutscenes, because they have to land like cutscene
 
 | | |
 |---|---|
-| **Camera** | Locked side view, ~70–90°. Damped follow with velocity lead. Never player-controlled. Vertical movement stays subtle. |
+| **Gameplay camera** | Locked quarter-view (isometric). Damped follow with velocity lead. Never player-controlled. |
 | **Entry move** | Every room opens pulled back ~55% wider and 2.4m higher, easing to gameplay framing over ~2.9s under the room card. |
-| **Rule** | The camera never cuts during play. Everything is one continuous take per attempt. |
+| **Play rule** | The camera never cuts during an attempt. One continuous take per run. |
+| **Intro camera** | **2.5D side view** (~80–90° orthographic feel). Deliberate contrast with gameplay: the incident is *watched*, the facility is *played*. Hard cuts and short push-ins only. |
+
+---
+
+## SEQ 00 · INTRO — 04/11
+*`SCRIPTED` · 28s · side-view cinematic · establishes the incident without explaining the loop*
+
+The player must leave this sequence knowing only: something went wrong at Hydraulic Press 3 on
+the morning of 04/11/2012; the site emptied; fourteen years later it is Saturday 09:41 again —
+and they are standing at Maintenance Intake. Do **not** state the anomaly, the programme, or
+that he will meet himself.
+
+**Asset language:** Sector C industrial kit already in the build — modular walls, pipes, columns,
+crates, control panels, Mixamo worker. Same Press 3 silhouette the player will recognise in
+Room III.
+
+### 00.1 — Before · `SCRIPTED` · 0.0–4.5s
+- **Shot** — Wide side-view of the Press 3 bay. Floor, overhead pipes, columns, the press body
+  filling the right third of frame. Cool working light. Depth from parallax layers (far wall,
+  mid machinery, near railing/crate).
+- **Action** — Worker present left-of-centre, idle, facing the press. Breath of life only —
+  shift of weight, no walk yet.
+- **Audio** — Industrial room tone, distant compressor. No music.
+- **On screen** — Small corner stamp only (incident report, not a title card):
+  `09:41 PM` / `04 / 11 / 2012`
+- **Story beat** — Ordinary morning of the containment close-attempt ([STORY.md](STORY.md) §04/11).
+
+### 00.2 — The switch · `SCRIPTED` · 4.5–9.5s
+- **Shot** — Camera eases and pushes in toward a wall isolator / safety panel beside the press.
+  Keep the press readable in the same composition so cause and machine stay linked.
+- **Action** — Worker walks to the panel (side-profile). Hand to the control. A clear physical
+  toggle: lever drops / lamp changes state. The panel answers (light dies or flips amber→dark).
+  No on-screen jargon.
+- **Audio** — Footsteps, then a single mechanical clack; room tone continues.
+- **On screen** — Stamp fades out by 5.5s. No explanatory text.
+- **Story beat** — Interlock disabled so the trial can run without returning him ([STORY.md](STORY.md)).
+
+### 00.3 — Something goes wrong · `SCRIPTED` · 9.5–14.0s
+- **Shot** — Snap wider to hold press + floor. Brief push as the ram drops. At impact: white
+  flash (1–2 frames) and a hitch of distortion/static over the *live* plate — not a solid red
+  full-screen.
+- **Action** — Press activates; ram descends hard. Worker reacts then is **gone** from frame
+  after the flash (empty space where he stood). Red emergency fixtures in the bay pulse and
+  bloom across the geometry — environmental light, scene still visible underneath.
+- **Audio** — Wind-up ticks → slam. Static burst on the flash. Alarm bed under, not over.
+- **On screen** — Nothing. Let the empty floor speak.
+- **Story beat** — The close fails; the field locks open with him inside. No memorial, only an
+  incident ([STORY.md](STORY.md)).
+
+### 00.4 — Aftermath · `SCRIPTED` · 14.0–18.0s
+- **Shot** — Same side angle, held. Press stopped low. Emergency red fades toward sodium/dark.
+  Occasional lamp flicker. Fine dust / haze in volume light.
+- **Action** — No worker. No evacuation title cards. The bay is simply vacated — tools left,
+  panel dark, press cold.
+- **Audio** — Alarm thins; room tone hollows out.
+- **On screen** — None.
+- **Story beat** — Evacuation, insurance position, gates chained — shown as abandonment, not copy.
+
+### 00.5 — Fourteen years of the same room · `SCRIPTED` · 18.0–23.0s
+- **Shot** — Slow dissolve or graded fade on the **same set**: desaturate, kill practicals,
+  leave one sick overhead. Camera creeps a half-metre closer — recognisably Press 3, older.
+- **Action** — Still empty. Optional: a single drip or cable sway. The machine has not moved.
+- **Audio** — Near silence; one distant metal tick.
+- **On screen** — None. Time is carried by light and emptiness, not “14 YEARS LATER.”
+- **Story beat** — Nothing in here has changed in fourteen years ([STORY.md](STORY.md) ending line).
+
+### 00.6 — Saturday threshold · `SCRIPTED` · 23.0–28.0s
+- **Shot** — Hard cut (or short black) into **Maintenance Intake** — the Level 1 spawn corridor —
+  still side-view for one last beat, then the frame eases toward gameplay quarter-view as the
+  cutscene ends.
+- **Action** — Empty intake under a single working lamp. Depth past the first door sits unlit.
+  He is not shown arriving; the player *becomes* him on the cut to play.
+- **Audio** — Soft room tone of Intake. Optional watch tick under.
+- **On screen** — Brief stamp:
+  `09:41 PM` / `04 / 11 / 2026`
+  then `SATURDAY`
+- **Story beat** — Summoned to the condemned plant on a Saturday morning at 09:41; the door opens
+  but does not walk him through ([STORY.md](STORY.md) §How he gets back).
+- **Exit** — Hard cut into Room I gameplay framing (`01.1`).
+
+**Intro rules**
+- Scenes over words. No large text-only cards. No full-screen solid red.
+- Before/after must share architecture so Press 3 is unmistakable.
+- Do not preview Shadows, the timer, or the loop.
 
 ---
 
@@ -188,4 +272,9 @@ They are produced by the player choosing to fail. Nothing in the build triggers 
 nothing should be added that does — if a script ever has to force any of these, the mechanic
 has stopped working.
 
+**SEQ 00** is the only fully scripted open. It is side-view on purpose; gameplay returns to
+quarter-view so the player feels the shift from *witness* to *operator*.
+
 Story and world detail: [STORY.md](STORY.md).
+Authoring reference for the intro set: `assets/intro_cutscene.blend` (built from kit pieces in
+`assets/`).
