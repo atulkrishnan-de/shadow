@@ -26,8 +26,8 @@ const $ = s => document.querySelector(s);
 const hit2 = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.z < b.z + b.d && a.z + a.d > b.z;
 
 const ZONES = [
-  { id: 'intake', num: 'I', name: 'INTAKE', sub: 'you have been here before', x0: 0, x1: 14, cp: { x: 2, z: 3 } },
-  { id: 'sorting', num: 'II', name: 'SORTING', sub: 'your name is already on the list', x0: 16, x1: 30, cp: { x: 17, z: 3 } },
+  { id: 'intake', num: 'I', name: 'INTAKE', sub: 'you have been here before', x0: 0, x1: 10, cp: { x: 2, z: 3 } },
+  { id: 'sorting', num: 'II', name: 'SORTING', sub: 'your name is already on the list', x0: 12, x1: 30, cp: { x: 13, z: 3 } },
   { id: 'press', num: 'III', name: 'PRESS ROOM', sub: 'the iterations are not free', x0: 32, x1: 44, cp: { x: 33, z: 5 } },
   { id: 'observation', num: 'IV', name: 'OBSERVATION', sub: 'the door was never locked', x0: 46, x1: 56, cp: { x: 47, z: 3 } },
 ];
@@ -60,6 +60,10 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { Keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in Keys) Keys[k] = false; });
+addEventListener('wheel', e => {
+  e.preventDefault();
+  ISO.targetDist = clamp(ISO.targetDist + e.deltaY * 0.015, 8, 30);
+}, { passive: false });
 
 const held = {
   left: () => !!(Keys.KeyA || Keys.ArrowLeft),
@@ -67,7 +71,7 @@ const held = {
   up: () => !!(Keys.KeyW || Keys.ArrowUp),
   down: () => !!(Keys.KeyS || Keys.ArrowDown),
   use: () => !!Keys.KeyE,
-  fastfwd: () => !!Keys.KeyR,
+  fastfwd: () => !!(Keys.ShiftLeft || Keys.ShiftRight),
   dash: () => !!Pressed.Space,
 };
 
@@ -143,10 +147,34 @@ const Audio = (() => {
 
   const S = {
     step(shadow) { playSfx('step_' + (Math.random() * 5 | 0), shadow ? 0.15 : 0.35, 0.9 + Math.random() * 0.2); },
-    die() { playSfx('die', 0.6); playSfx('die_low', 0.4); },
+    die() {
+      playSfx('die', 0.4);
+      if (!ready) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(260, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.6);
+      g.gain.setValueAtTime(0.35, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.7);
+      o.connect(g).connect(master); o.start(t); o.stop(t + 0.7);
+      const ns = ctx.createBufferSource(); ns.buffer = NB;
+      const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.setValueAtTime(3000, t); nf.frequency.exponentialRampToValueAtTime(200, t + 0.5);
+      const ng = ctx.createGain(); ng.gain.setValueAtTime(0.25, t); ng.gain.linearRampToValueAtTime(0, t + 0.5);
+      ns.connect(nf).connect(ng).connect(master); ns.start(t); ns.stop(t + 0.5);
+    },
     spawnShadow() { playSfx('spawn_shadow', 0.5); },
     plate(on) { playSfx(on ? 'plate_on' : 'plate_off', 0.5, 0.9 + Math.random() * 0.2); },
-    button() { playSfx('button', 0.5); },
+    button() {
+      playSfx('button', 0.3);
+      if (!ready) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.setValueAtTime(880, t);
+      o.frequency.setValueAtTime(1100, t + 0.04);
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.12);
+      o.connect(g).connect(master); o.start(t); o.stop(t + 0.12);
+    },
     door() { playSfx('door_open', 0.45); },
     crush() { playSfx('crush', 0.7); },
     laser() { playSfx('laser', 0.3); },
@@ -228,12 +256,16 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0c1e);
 scene.fog = new THREE.FogExp2(0x101530, BASE_FOG);
 
-const ISO = { az: Math.PI * 0.235, elevRad: 1.02, dist: 15 };
-const CAM_DIR = new THREE.Vector3(
-  Math.sin(ISO.az) * Math.cos(ISO.elevRad),
-  Math.sin(ISO.elevRad),
-  Math.cos(ISO.az) * Math.cos(ISO.elevRad),
-).normalize();
+const ISO = { az: Math.PI * 0.235, elevRad: 1.02, targetElevRad: 1.02, dist: 15, targetDist: 15 };
+const CAM_DIR = new THREE.Vector3();
+function updateCamDir() {
+  CAM_DIR.set(
+    Math.sin(ISO.az) * Math.cos(ISO.elevRad),
+    Math.sin(ISO.elevRad),
+    Math.cos(ISO.az) * Math.cos(ISO.elevRad),
+  ).normalize();
+}
+updateCamDir();
 const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 1, 260);
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -487,6 +519,31 @@ function box(w, h, d, mat, x, y, z, parent) {
 /* ── Character model cache ── */
 const CharCache = { model: null, skinTex: null, shadowTex: null, ready: false };
 
+/* ── Box crate model cache ── */
+const CrateCache = { model: null, ready: false };
+
+function loadCrateAsset() {
+  if (typeof THREE.FBXLoader !== 'function') return Promise.resolve();
+  const loader = new THREE.FBXLoader();
+  return new Promise(r => loader.load('assets/box.fbx?v=' + ASSET_V, obj => {
+    obj.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+    CrateCache.model = obj; CrateCache.ready = true;
+    console.log('Crate FBX loaded');
+    r();
+  }, undefined, e => { console.warn('crate fbx fail', e); r(); }));
+}
+
+function spawnCrate(w, h, d, x, y, z) {
+  if (!CrateCache.ready) return box(w, h, d, M.crate, x, y, z);
+  const inst = CrateCache.model.clone();
+  const bb = new THREE.Box3().setFromObject(inst);
+  const sz = new THREE.Vector3(); bb.getSize(sz);
+  inst.scale.set(w / Math.max(sz.x, 0.01), h / Math.max(sz.y, 0.01), d / Math.max(sz.z, 0.01));
+  inst.position.set(x + w / 2, y, z + d / 2);
+  World.root.add(inst);
+  return inst;
+}
+
 function loadCharacterAssets() {
   const loader = new THREE.GLTFLoader();
   const texLoader = new THREE.TextureLoader();
@@ -651,7 +708,8 @@ function disposeTree(obj) { obj.traverse(o => { if ((o.isMesh || o.isPoints) && 
 function pushSolid(s) { World.solids.push(s); insertSolidGrid(s); return s; }
 function addStair(o) {
   pushSolid({ x: o[0], y: o[1], z: o[2], w: o[3], h: o[4], d: o[5] });
-  box(o[3], o[4], o[5], M[o[6] === 'step' ? 'step' : o[6]] || M.wall, o[0], o[1], o[2]);
+  if (o[6] === 'crate') spawnCrate(o[3], o[4], o[5], o[0], o[1], o[2]);
+  else box(o[3], o[4], o[5], M[o[6] === 'step' ? 'step' : o[6]] || M.wall, o[0], o[1], o[2]);
 }
 function sealDoorway(x, doorZ, w, y, h, z0, z1) {
   const half = w / 2;
@@ -679,13 +737,23 @@ class Plate {
     let hash = 0; for (let i = 0; i < this.id.length; i++) hash = (hash * 31 + this.id.charCodeAt(i)) >>> 0;
     this.pitchRatio = PITCH[hash % PITCH.length];
     const g = new THREE.Group(); World.root.add(g); this.g = g;
-    const pw = o.w || 2.4, pd = o.w || 2.4, y = o.y || 0;
+    const pw = o.w || 2.4, y = o.y || 0;
+    const rad = pw / 2;
     g.position.set(o.x, y, o.z);
-    box(pw + 0.4, 0.1, pd + 0.4, M.steelDark, -pw / 2 - 0.2, 0, -pd / 2 - 0.2, g);
-    this.pad = box(pw, 0.14, pd, M.steel, -pw / 2, 0.1, -pd / 2, g);
-    this.ring = box(pw * 0.7, 0.03, 0.12, new THREE.MeshBasicMaterial({ color: 0x2c4c3a }), -pw * 0.35, 0.24, pd / 2 - 0.06, g);
+    const baseGeo = new THREE.CylinderBufferGeometry(rad + 0.2, rad + 0.2, 0.1, 24);
+    const baseMesh = new THREE.Mesh(baseGeo, M.steelDark);
+    baseMesh.position.y = 0.05; baseMesh.castShadow = false; baseMesh.receiveShadow = true;
+    g.add(baseMesh);
+    const padGeo = new THREE.CylinderBufferGeometry(rad, rad, 0.14, 24);
+    this.pad = new THREE.Mesh(padGeo, M.steel);
+    this.pad.position.y = 0.17; this.pad.castShadow = false; this.pad.receiveShadow = true;
+    g.add(this.pad);
+    const ringGeo = new THREE.TorusBufferGeometry(rad * 0.7, 0.03, 8, 32);
+    ringGeo.rotateX(Math.PI / 2);
+    this.ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x2c4c3a }));
+    this.ring.position.y = 0.25; g.add(this.ring);
     this.light = new THREE.PointLight(0x4fffb0, 0, 5, 2); this.light.position.set(0, 0.5, 0); g.add(this.light);
-    this.y = y; this.footprint = { x: o.x - pw / 2, z: o.z - pd / 2, w: pw, d: pd };
+    this.y = y; this.footprint = { x: o.x - rad, z: o.z - rad, w: pw, d: pw };
   }
   trigger(actors) {
     const f = this.footprint; let on = false;
@@ -694,14 +762,36 @@ class Plate {
       if (Math.abs(a.y - this.y) > 0.6) continue;
       if (a.x > f.x - 0.2 && a.x < f.x + f.w + 0.2 && a.z > f.z - 0.2 && a.z < f.z + f.d + 0.2) { on = true; break; }
     }
-    if (on !== this.on) { this.on = on; Audio.S.plate(on, this.pitchRatio); }
+    if (on && !this.on) {
+      Audio.S.plate(true, this.pitchRatio);
+      zoomToShowDoor(this.id);
+    } else if (!on && this.on) {
+      Audio.S.plate(false, this.pitchRatio);
+    }
+    this.on = on;
     World.sig[this.id] = on;
   }
   render(dt) {
     this.depress = damp(this.depress, this.on ? 1 : 0, 18, dt);
-    this.pad.position.y = 0.1 - this.depress * 0.07;
+    this.pad.position.y = 0.17 - this.depress * 0.07;
     this.ring.material.color.setHex(this.on ? 0x4fffb0 : 0x2c4c3a);
     if (!this._lightCulled) this.light.intensity = damp(this.light.intensity, this.on ? 1.3 : 0, 10, dt);
+  }
+}
+
+function zoomToShowDoor(plateId) {
+  for (const e of World.ents) {
+    if (!(e instanceof Door)) continue;
+    if (!e.o.req || !e.o.req.includes(plateId)) continue;
+    const dx = e.o.x - (G.player ? G.player.x : 0);
+    const dz = e.o.z - (G.player ? G.player.z : 0);
+    const dist = Math.hypot(dx, dz);
+    if (dist > 3) {
+      const extra = clamp(dist * 0.25, 2, 8);
+      ISO.targetDist = ISO.targetDist + extra;
+      setTimeout(() => { ISO.targetDist = 15; }, 1200);
+    }
+    break;
   }
 }
 
@@ -716,7 +806,7 @@ class Button {
   trigger(actors) {
     const o = this.o; let fired = false;
     for (const a of actors) { if (a.alive && Math.hypot(a.x - o.x, a.z - o.z) < 1.3 && a.usePress) fired = true; }
-    if (fired) { Audio.S.button(); if (o.mode === 'latch') this.latched = true; World.sig[this.id] = true; this.flash = 0.25; }
+    if (fired) { Audio.S.button(); if (o.mode === 'latch') this.latched = true; World.sig[this.id] = true; this.flash = 0.25; zoomToShowDoor(this.id); }
     else World.sig[this.id] = o.mode === 'latch' ? this.latched : false;
   }
   render(dt) {
@@ -1029,11 +1119,11 @@ function decorateFacility() {
   }
 
   // ─── Internal wall decorations (on divider walls) ───
-  // Wall at x=14.5 (between Sector I & II)
-  spawnProp('sm-door-wall', 14.5, 0, -4.5, 0.9, H);
-  spawnProp('sm-hexagon', 14.5, 1.6, -1, 2.5, H);
-  spawnProp('sm-plate', 14.5, 1.4, 8, 2, H);
-  spawnProp('sm-output', 14.5, 1.8, 14, 2.5, H);
+  // Wall at x=11 (between Sector I & II)
+  spawnProp('sm-door-wall', 11, 0, -4.5, 0.9, H);
+  spawnProp('sm-hexagon', 11, 1.6, -1, 2.5, H);
+  spawnProp('sm-plate', 11, 1.4, 8, 2, H);
+  spawnProp('sm-output', 11, 1.8, 14, 2.5, H);
   // Wall at x=30.5 (between Sector II & III, door d2 gap z=4–8)
   spawnProp('sm-door-wall', 30.5, 0, -3, 0.9, -H);
   spawnProp('sm-hexagon', 30.5, 1.5, 1, 2.5, -H);
@@ -1061,7 +1151,7 @@ function decorateFacility() {
   spawnProp('sm-door-wall', 52, 0, -4, 0.9, H);
   spawnProp('sm-plate-sm', 52, 1.5, 15, 2, -H);
 
-  // ════════════ SECTOR I — INTAKE (x: -2 → 14.5) ════════════
+  // ════════════ SECTOR I — INTAKE (x: -2 → 11) ════════════
   // Floor props — crate stack near entrance
   spawnProp('sm-crate', 0, 0, -3, 1.2, 0.3);
   spawnProp('sm-crate', 0.9, 0, -4, 1, -0.2);
@@ -1069,14 +1159,14 @@ function decorateFacility() {
   spawnProp('sm-crate', 1.5, 0, -2, 1, 1.1);
   spawnProp('sm-container', 0.5, 0, -1.5, 0.9, 0.4);
   // Storage shelves
-  spawnProp('sm-shelf-tall', 12, 0, -4, 0.8, PI);
-  spawnProp('sm-shelf', 12, 0, 16, 0.7, 0);
+  spawnProp('sm-shelf-tall', 10, 0, -4, 0.8, PI);
+  spawnProp('sm-shelf', 10, 0, 16, 0.7, 0);
   spawnProp('sm-shelf-tall', 0, 0, 16, 0.7, -H);
   // Lab equipment
   spawnProp('lab-extinguisher', 4, 0, -4.5, 1, 0.4);
   spawnProp('lab-cabinet', -0.5, 0, 8, 1, H);
   // Computers & tech
-  spawnProp('sm-computer-sm', 11, 0, 6, 0.7, PI * 0.7);
+  spawnProp('sm-computer-sm', 9.5, 0, 6, 0.7, PI * 0.7);
   spawnProp('sm-computer', 5, 0, 15, 0.7, PI);
   spawnProp('sm-base', 9, 0, 14, 0.8, 0.3);
   // Structural
@@ -1087,10 +1177,10 @@ function decorateFacility() {
   spawnProp('sm-container', 8, 0, -3.5, 1, 0.8);
   spawnProp('sm-crate-long', 7, 0, 16, 0.9, 0.6);
   spawnProp('sm-vessel', 3, 0, 6, 1.2, 0.5);
-  spawnProp('sm-base', 12, 0, 10, 0.7, 1.2);
+  spawnProp('sm-base', 10, 0, 10, 0.7, 1.2);
   spawnProp('sm-laser', 10, 0, -3, 0.6, 0.9);
 
-  // ════════════ SECTOR II — SORTING LAB (x: 14.5 → 30.5) ════════════
+  // ════════════ SECTOR II — SORTING LAB (x: 11 → 30.5) ════════════
   // Lab benches / tables
   spawnProp('lab-cabinet', 18, 0, 12.6, 1, PI);
   spawnProp('lab-magnifier', 17.3, 0.75, 12.3, 1, 0.2);
@@ -1234,7 +1324,7 @@ function buildFacility() {
   wallSolid(b.x1, 0, b.z0 - WT, WT, c, 12.8 - (b.z0 - WT));
   wallSolid(b.x1, 0, 15.2, WT, c, (b.z1 + WT) - 15.2);
 
-  internalWall(14.5, b.z0, b.z1, 2, 5, c);
+  internalWall(11, b.z0, b.z1, 2, 5, c);
   internalWall(30.5, b.z0, b.z1, 4, 8, c);
   internalWall(44.5, b.z0, b.z1, 6, 10, c);
   internalWall(50, b.z0, b.z1, 4.5, 7.5, c);
@@ -1242,14 +1332,14 @@ function buildFacility() {
 
 
   for (const s of [
-    [6, 0, -4, 1.5, 1.3, 1.5, 'crate'], [10, 0, 5, 1.4, 1.0, 1.4, 'rust'],
+    [6, 0, -4, 1.5, 1.3, 1.5, 'crate'], [9, 0, 5, 1.4, 1.0, 1.4, 'rust'],
     [22, 0, 9, 3, 0.42, 3, 'step'], [22.6, 0.42, 9.6, 1.8, 0.42, 1.8, 'step'],
     [34.5, 0, 7, 0.6, 0.42, 4, 'step'], [39.4, 0, 7, 0.6, 0.42, 4, 'step'],
   ]) addStair(s);
 
   const objects = [
     { t: 'plate', id: 'p1', x: 8, z: 3.5, w: 2.4 },
-    { t: 'door', id: 'd1', x: 14.5, z: 3.5, w: 2.8, req: ['p1'], onWall: true },
+    { t: 'door', id: 'd1', x: 11, z: 3.5, w: 2.8, req: ['p1'], onWall: true },
     { t: 'keepsake', x: 4, z: -3, item: 'watch', timer: 3, text: 'Your watch.<br><span style="opacity:.55">It stopped at 09:41 and never started again.</span>' },
     { t: 'keepsake', x: 16, z: 3.5, item: 'badge', timer: 5, text: 'A badge, still warm.<br><span style="opacity:.55">The photograph on it is yours.</span>' },
 
@@ -1306,7 +1396,7 @@ function buildFacility() {
   addLighting();
 }
 
-const PH = { R: 0.34, ACCEL: 90, FRICTION: 80, MAX: 7.5, DASH_SPEED: 16, DASH_DUR: 0.28, DASH_CD: 1.4 };
+const PH = { R: 0.34, ACCEL: 50, FRICTION: 28, MAX: 6.0, DASH_SPEED: 12, DASH_DUR: 0.28, DASH_CD: 1.0 };
 
 function groundAt(x, z, curY) {
   let g = 0;
@@ -1376,10 +1466,16 @@ class Actor {
       let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       let dz = (input.down ? 1 : 0) - (input.up ? 1 : 0);
       if (dx !== 0 && dz !== 0) { dx *= 0.707; dz *= 0.707; }
+      const ca = Math.cos(ISO.az), sa = Math.sin(ISO.az);
+      const rdx = dx * ca + dz * sa;
+      const rdz = -dx * sa + dz * ca;
+      dx = rdx; dz = rdz;
       if (dx !== 0) { this.vx += dx * PH.ACCEL * dt; this.vx = clamp(this.vx, -PH.MAX, PH.MAX); }
       else { const f = PH.FRICTION * dt; this.vx = Math.abs(this.vx) <= f ? 0 : this.vx - Math.sign(this.vx) * f; }
       if (dz !== 0) { this.vz += dz * PH.ACCEL * dt; this.vz = clamp(this.vz, -PH.MAX, PH.MAX); }
       else { const f = PH.FRICTION * dt; this.vz = Math.abs(this.vz) <= f ? 0 : this.vz - Math.sign(this.vz) * f; }
+      const spd2 = this.vx * this.vx + this.vz * this.vz;
+      if (spd2 > PH.MAX * PH.MAX) { const s = PH.MAX / Math.sqrt(spd2); this.vx *= s; this.vz *= s; }
     }
 
     if (G.dev) {
@@ -1441,14 +1537,14 @@ const G = {
   discovered: new Set(),
   zonesSeen: new Set(),
   checkpoint: null,
-  speed: 1, shake: 0, camPull: 0, dev: DEV_DEBUG,
+  speed: 1, shake: 0, camPull: 0, dev: DEV_DEBUG, timerStarted: false,
   timers: { intro: 0, death: 0, zoneCard: 0 }, deathCause: '', flashT: 0,
   heart: 0, cue5: false, cue3: false, hintShown: false,
 };
 
 const UI = {
   hud: $('#hud'), time: $('#time'), bonus: $('#bonus'), shadowcount: $('#shadowcount'), attempt: $('#attempt'),
-  speed: $('#speed'), hint: $('#hint'), frag: $('#frag'), keepsake: $('#keepsake'),
+  speed: $('#speed'), hint: $('#hint'), frag: $('#frag'), keepsake: $('#keepsake'), deathprompt: $('#deathprompt'),
   card: $('#roomcard'), menu: $('#menu'), pause: $('#pause'), ending: $('#ending'), vignette: $('#vignette'),
   flash: $('#flash'), fade: $('#fade'), loading: $('#loading'), dbg: $('#dbg'), build: $('#build'),
 };
@@ -1509,8 +1605,8 @@ function startRun() {
   clearActors(); resetEntities(); syncAbilities();
   G.tick = 0; G.rec = [];
   G.cue5 = G.cue3 = false; G.heart = 0;
-  G.time = G.baseTime;
-  UI.vignette.classList.remove('alarm');
+  G.time = G.baseTime; G.timerStarted = false;
+  UI.vignette.style.background = '';
 
   const sp = G.checkpoint || SPAWN;
   G.player = new Actor(false);
@@ -1580,7 +1676,6 @@ function hazardKill(actor, kz) {
 
 const _doorBuf = []; const _actorBuf = [];
 function stepSim(dt) {
-  G.tick++;
   _doorBuf.length = 0;
   for (let i = 0, n = World.ents.length; i < n; i++) { const e = World.ents[i]; if (e instanceof Door) { const s = e.solid(); if (s) _doorBuf.push(s); } }
   const doors = _doorBuf;
@@ -1594,11 +1689,18 @@ function stepSim(dt) {
   };
   if (input.dash) Pressed.Space = false;
 
+  if (!G.timerStarted && (input.left || input.right || input.up || input.down || input.dash)) {
+    G.timerStarted = true;
+  }
+
+  if (G.timerStarted) G.tick++;
+
   G.player.simulate(dt, input, doors);
   Pressed.KeyE = false;
 
   for (const s of G.shadows) {
     if (!s.alive) continue;
+    if (!G.timerStarted) continue;
     const tickIdx = G.tick - 1;
     if (tickIdx < s.tape.length) s.playback(s.tape[tickIdx], tickIdx);
     else if (tapeAnchored(s.tape)) {
@@ -1648,18 +1750,23 @@ function stepSim(dt) {
 
   G.rec.push(G.player.record());
 
-  if (!G.dev) {
+  if (!G.dev && G.timerStarted) {
     G.time -= dt;
-    if (G.time <= 5 && !G.cue5) { G.cue5 = true; UI.vignette.classList.add('alarm'); Audio.S.alarm(); }
+    if (G.time < 4 && G.time > 0) {
+      const urgency = 1 - G.time / 4;
+      const r = Math.round(60 + urgency * 90);
+      const a1 = (0.15 + urgency * 0.25).toFixed(2);
+      const a2 = (0.4 + urgency * 0.25).toFixed(2);
+      const inner = Math.round(55 - urgency * 15);
+      const mid = Math.round(80 - urgency * 10);
+      UI.vignette.style.background =
+        'radial-gradient(ellipse 80% 72% at 50% 52%, rgba(0,0,0,0) ' + inner + '%, rgba(' + r + ',0,0,' + a1 + ') ' + mid + '%, rgba(0,0,0,' + a2 + ') 100%)';
+    }
+    if (G.time <= 4 && !G.cue5) { G.cue5 = true; Audio.S.alarm(); }
     if (G.time <= 3 && !G.cue3) G.cue3 = true;
-    if (G.time <= 5 && G.time > 0) { G.heart += dt; if (G.heart > 0.55) { G.heart = 0; Audio.S.heart(); } }
+    if (G.time <= 4 && G.time > 0) { G.heart += dt; if (G.heart > 0.55) { G.heart = 0; Audio.S.heart(); } }
     if (G.time <= 0 && G.player.alive) killPlayer('timeout');
   }
-
-  const fastfwd = Keys.KeyR && G.player.alive && !G.dev;
-  if (fastfwd) G.time -= dt * 9;
-  const ffEl = document.getElementById('fastfwd');
-  if (ffEl) ffEl.style.opacity = fastfwd ? '1' : '0';
 }
 
 function flash(v) { G.flashT = v; }
@@ -1670,8 +1777,8 @@ function showBonus(n) { UI.bonus.textContent = '+' + n + 's'; UI.bonus.classList
 
 function updateHUD() {
   UI.time.textContent = fmtTime(G.time) + ' / ' + fmtTime(G.baseTime);
-  UI.time.classList.toggle('low', G.time <= 10 && G.time > 5);
-  UI.time.classList.toggle('crit', G.time <= 5);
+  UI.time.classList.toggle('low', G.time <= 6 && G.time > 4);
+  UI.time.classList.toggle('crit', G.time <= 4);
   UI.shadowcount.textContent = '× ' + G.shadows.filter(s => s.alive).length;
   UI.attempt.textContent = 'LOOP ' + G.loop;
   if (DEV_DEBUG && UI.dbg) {
@@ -1696,6 +1803,11 @@ function updateCamera(dt) {
   camTarget.x = damp(camTarget.x, tx, 12, dt);
   camTarget.y = damp(camTarget.y, G.player.y + 1.0, 10, dt);
   camTarget.z = damp(camTarget.z, tz, 12, dt);
+  ISO.dist = damp(ISO.dist, ISO.targetDist, 6, dt);
+  if (Keys.BracketLeft) ISO.targetElevRad = clamp(ISO.targetElevRad + 1.2 * dt, 0.15, 1.45);
+  if (Keys.BracketRight) ISO.targetElevRad = clamp(ISO.targetElevRad - 1.2 * dt, 0.15, 1.45);
+  ISO.elevRad = damp(ISO.elevRad, ISO.targetElevRad, 8, dt);
+  updateCamDir();
   const dist = ISO.dist * (1 + pull * 0.12);
   const shakeAmt = G.shake * 0.18;
   camPos.copy(camTarget).addScaledVector(CAM_DIR, dist);
@@ -1765,6 +1877,7 @@ function fullRestart() {
   G.zonesSeen.clear();
   syncAbilities();
   for (const f of World.frags) f.seen = false;
+  UI.deathprompt.style.opacity = '0';
   startRun();
 }
 
@@ -1773,9 +1886,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
 
-  if (Keys.Digit1) G.speed = 1;
-  if (Keys.Digit2) G.speed = 2;
-  if (Keys.Digit3) G.speed = 4;
+  G.speed = (Keys.ShiftLeft || Keys.ShiftRight) && G.state === 'play' ? 2 : 1;
   UI.speed.classList.toggle('on', G.speed > 1);
   if (G.speed > 1) UI.speed.textContent = 'FAST FORWARD ×' + G.speed;
 
@@ -1803,7 +1914,10 @@ function frame(now) {
     }
   } else if (G.state === 'dying') {
     G.timers.death += dt;
-    if (G.timers.death > 0.35) commitDeath();
+    if (G.timers.death > 0.35) { G.state = 'dead'; UI.deathprompt.style.opacity = '1'; UI.vignette.style.background = ''; }
+    updateCamera(dt);
+  } else if (G.state === 'dead') {
+    if (Pressed.KeyR) { Pressed.KeyR = false; UI.deathprompt.style.opacity = '0'; commitDeath(); }
     updateCamera(dt);
   } else if (G.state === 'pause') {
     if (Pressed.Escape) { Pressed.Escape = false; G.state = 'play'; UI.pause.classList.remove('on'); }
@@ -1865,7 +1979,7 @@ function frame(now) {
 }
 
 (async () => {
-  await Promise.all([loadProps(true), loadCharacterAssets()]);
+  await Promise.all([loadProps(true), loadCharacterAssets(), loadCrateAsset()]);
   buildFacility();
   camTarget.set(SPAWN.x, 1, SPAWN.z);
   camPos.copy(camTarget).addScaledVector(CAM_DIR, ISO.dist);
