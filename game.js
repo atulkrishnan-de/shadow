@@ -472,6 +472,37 @@ function loadProps(priority) {
       }, undefined, (err) => { console.warn('PROP LOAD FAIL:', name, err); resolve(); });
   })));
 }
+// ── Sector-based rendering: only draw geometry near the player ──
+const SECTOR_BOUNDS = [
+  { id: 0, x0: -3, x1: 11 },
+  { id: 1, x0: 11, x1: 30.5 },
+  { id: 2, x0: 30.5, x1: 44.5 },
+  { id: 3, x0: 44.5, x1: 59 },
+];
+function sectorOf(x) {
+  for (let i = 0; i < SECTOR_BOUNDS.length; i++) {
+    if (x >= SECTOR_BOUNDS[i].x0 && x < SECTOR_BOUNDS[i].x1) return i;
+  }
+  return x < 0 ? 0 : SECTOR_BOUNDS.length - 1;
+}
+const _sectorGroups = SECTOR_BOUNDS.map(() => []);
+let _lastVisibleSector = -1;
+
+function registerSectorObj(obj) {
+  const s = sectorOf(obj.position.x);
+  _sectorGroups[s].push(obj);
+}
+
+function updateSectorVisibility(playerX) {
+  const cur = sectorOf(playerX);
+  if (cur === _lastVisibleSector) return;
+  _lastVisibleSector = cur;
+  for (let s = 0; s < _sectorGroups.length; s++) {
+    const show = Math.abs(s - cur) <= 1;
+    for (const obj of _sectorGroups[s]) obj.visible = show;
+  }
+}
+
 const _propList = [];
 function spawnProp(name, x, y, z, scale, rotY) {
   const base = PROPS[name]; if (!base) return null;
@@ -483,6 +514,7 @@ function spawnProp(name, x, y, z, scale, rotY) {
   inst.position.set(x, y, z);
   World.root.add(inst);
   _propList.push(inst);
+  registerSectorObj(inst);
   return inst;
 }
 function spawnWallPanel(name, x, y, z, rotY, lenScale) {
@@ -494,6 +526,7 @@ function spawnWallPanel(name, x, y, z, rotY, lenScale) {
   inst.position.set(x, y, z);
   World.root.add(inst);
   _propList.push(inst);
+  registerSectorObj(inst);
   return inst;
 }
 function tileWallRun(x0, z0, x1, z1, y) {
@@ -513,6 +546,7 @@ function box(w, h, d, mat, x, y, z, parent) {
   m.position.set(x + w / 2, y + h / 2, z + d / 2);
   m.castShadow = false; m.receiveShadow = true;
   (parent || World.root).add(m);
+  if (!parent) registerSectorObj(m);
   return m;
 }
 
@@ -633,7 +667,7 @@ function poseFigure(rig, st, dt) {
       rig.curAction = want;
     }
     if (rig.curAction === 'run' && rig.actions.run) {
-      rig.actions.run.timeScale = Math.max(0.5, spd / 4.5);
+      rig.actions.run.timeScale = Math.max(0.5, spd / 5.0);
     }
     rig.mixer.update(dt);
     if (rig.isShadow && rig.mat) {
@@ -1044,11 +1078,12 @@ function buildLamps(lamps) {
     const tube = box(1.3, 0.08, 0.3, alive ? new THREE.MeshBasicMaterial({ color: 0xffb870 }) : M.steelDark, -0.65, -0.1, -0.15, g);
     const lt = new THREE.PointLight(0xffaa44, alive ? 3.5 : 0, 12, 1.8); lt.position.set(0, -0.3, 0); g.add(lt);
     World.lamps.push({ alive, baseAlive: alive, tube, light: lt, flickId: World.lamps.length * 7.3, g });
+    registerSectorObj(g);
   }
 }
 
 function buildExit(x, z) {
-  const g = new THREE.Group(); World.root.add(g); g.position.set(x, 0, z);
+  const g = new THREE.Group(); World.root.add(g); g.position.set(x, 0, z); registerSectorObj(g);
   box(0.35, 1.7, 2.6, M.steelDark, -1.6, 0, -1.3, g);
   box(0.35, 1.7, 2.6, M.steelDark, 1.25, 0, -1.3, g);
   box(0.16, 3.8, 2.2, new THREE.MeshBasicMaterial({ color: 0x6affc0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }), -1.3, 0, -1.1, g);
@@ -1068,7 +1103,10 @@ function addEntity(o) {
   else if (o.t === 'laser') e = new Laser(o);
   else if (o.t === 'keepsake') e = new Keepsake(o);
   else if (o.t === 'ability') e = new AbilityPickup(o);
-  if (e) { e.kind = o.t; World.ents.push(e); }
+  if (e) {
+    e.kind = o.t; World.ents.push(e);
+    if (e.g) registerSectorObj(e.g);
+  }
 }
 
 function decorateFacility() {
@@ -1396,7 +1434,7 @@ function buildFacility() {
   addLighting();
 }
 
-const PH = { R: 0.34, ACCEL: 50, FRICTION: 28, MAX: 6.0, DASH_SPEED: 12, DASH_DUR: 0.28, DASH_CD: 1.0 };
+const PH = { R: 0.34, ACCEL: 72, FRICTION: 55, MAX: 8.5, DASH_SPEED: 18, DASH_DUR: 0.28, DASH_CD: 1.0 };
 
 function groundAt(x, z, curY) {
   let g = 0;
@@ -1960,19 +1998,8 @@ function frame(now) {
     }
   }
 
-  // Distance-based prop culling — check a batch each frame
-  if (_propList.length > 0 && G.player) {
-    const CULL_DIST2 = 20 * 20;
-    const batch = Math.min(32, _propList.length);
-    if (typeof frame._propIdx === 'undefined') frame._propIdx = 0;
-    for (let i = 0; i < batch; i++) {
-      const idx = (frame._propIdx + i) % _propList.length;
-      const p = _propList[idx];
-      const dx = p.position.x - px, dz = p.position.z - pz;
-      p.visible = (dx * dx + dz * dz) < CULL_DIST2;
-    }
-    frame._propIdx = (frame._propIdx + batch) % _propList.length;
-  }
+  // Sector-based visibility — only render current + adjacent sectors
+  if (G.player) updateSectorVisibility(px);
 
   for (const k in Pressed) Pressed[k] = false;
   renderer.render(scene, camera);
