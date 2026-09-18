@@ -1,4 +1,4 @@
-# SHADOW — storyboard
+# The Last Shift — storyboard
 
 Shot breakdown for the playable slice. Because the game is built on repetition, most of its
 strongest moments are **systemic** — caused by the player, not triggered by a script. They
@@ -261,7 +261,7 @@ Room III.
 ### 05.6 — Title · `SCRIPTED` · 24.6s
 - **Shot** — Title fades up over 3s in violet and holds. No credits roll, no button prompt.
 - **Audio** — Two sustained sine tones, a fifth apart.
-- **On screen** — `SHADOW`
+- **On screen** — `THE LAST SHIFT`
 
 ---
 

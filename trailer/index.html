@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Last Shift — Trailer</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #000;
+      cursor: none;
+    }
+    body.show-cursor { cursor: default; }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      background: #000;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.7s ease;
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .slide.leaving {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .slide iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+    }
+
+    .clip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      text-align: center;
+      padding: 6vh 8vw;
+    }
+    .clip video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+    .clip .placeholder {
+      position: relative;
+      z-index: 1;
+      max-width: 36em;
+    }
+    .clip .placeholder.hidden { display: none; }
+    .clip .clip-label {
+      font-family: var(--mono);
+      font-size: clamp(0.65rem, 1vw, 0.9rem);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(179,136,255,0.45);
+      margin-bottom: 1.2em;
+    }
+    .clip .clip-title {
+      font-family: var(--sans);
+      font-size: clamp(1.2rem, 2.4vw, 2.2rem);
+      font-weight: 600;
+      color: rgba(232,230,227,0.75);
+      margin-bottom: 0.6em;
+    }
+    .clip .clip-hint {
+      font-family: var(--sans);
+      font-size: clamp(0.85rem, 1.4vw, 1.15rem);
+      font-style: italic;
+      color: rgba(232,230,227,0.35);
+      line-height: 1.55;
+    }
+    .clip .clip-file {
+      margin-top: 1.6em;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      color: rgba(179,136,255,0.3);
+    }
+
+    /* UI chrome — fades in on mouse move */
+    #chrome {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #chrome.visible { opacity: 1; }
+
+    #progress {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: rgba(255,255,255,0.06);
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--violet);
+      box-shadow: 0 0 12px rgba(179,136,255,0.5);
+      transition: width 0.15s linear;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 3.5vh;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1.2em;
+      pointer-events: auto;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(232,230,227,0.4);
+    }
+    #controls button {
+      background: none;
+      border: 1px solid rgba(232,230,227,0.2);
+      color: rgba(232,230,227,0.55);
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      padding: 0.55em 1.1em;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #controls button:hover {
+      border-color: rgba(179,136,255,0.5);
+      color: var(--violet);
+    }
+    #slide-meta {
+      min-width: 14em;
+      text-align: center;
+    }
+
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      cursor: pointer;
+      transition: opacity 0.8s ease;
+    }
+    #start-screen.gone {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #start-screen .title {
+      font-family: var(--sans);
+      font-size: clamp(1.8rem, 5.5vw, 4.5rem);
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--violet);
+      text-shadow: 0 0 60px rgba(179,136,255,0.4);
+      margin-bottom: 0.4em;
+      text-align: center;
+      max-width: 92vw;
+      line-height: 1.15;
+    }
+    #start-screen .prompt {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(232,230,227,0.4);
+      animation: fadeIn 1.5s ease infinite alternate;
+    }
+
+    .replay {
+      margin-top: 2em;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(179,136,255,0.5);
+      background: none;
+      border: 1px solid rgba(179,136,255,0.25);
+      padding: 0.7em 1.4em;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .replay:hover {
+      color: var(--violet);
+      border-color: rgba(179,136,255,0.6);
+    }
+  </style>
+</head>
+<body>
+  <div id="start-screen">
+    <div class="title">The Last Shift</div>
+    <div class="prompt">Click to play</div>
+  </div>
+
+  <div id="stage"></div>
+
+  <div id="chrome">
+    <div id="progress"><div id="progress-bar"></div></div>
+    <div id="controls">
+      <button type="button" id="btn-prev">Prev</button>
+      <span id="slide-meta">—</span>
+      <button type="button" id="btn-pause">Pause</button>
+      <button type="button" id="btn-next">Next</button>
+    </div>
+  </div>
+
+  <script>
+  /**
+   * Trailer sequence.
+   *
+   * type: 'card'  — loads a flashcard HTML, advances after animation + hold
+   * type: 'clip'  — plays video if src is set; otherwise shows placeholder then advances
+   *
+   * To insert gameplay: drop files in trailer/clips/ and set src, e.g.
+   *   { type: 'clip', id: 'A', src: 'clips/a-intake-spawn.mp4', label: '…' }
+   *
+   * skipIfEmpty: if true and no src, the clip is skipped (default true for smooth card flow)
+   */
+  const SEQUENCE = [
+    { type: 'card', src: 'card-01-cold-open.html',     label: '01 · Cold Open',       duration: 7200 },
+    { type: 'clip', id: 'A', src: null, label: 'Room I spawn · camera pull-back',
+      hint: 'Player under the single lamp. Room card: ROOM I — INTAKE',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-02-sector-c.html',      label: '02 · Sector C',        duration: 6800 },
+    { type: 'clip', id: 'B', src: null, label: 'Hub walkthrough',
+      hint: 'Stairs, locked doors, empty walkways. Scale of the plant.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-03-the-programme.html', label: '03 · The Programme',   duration: 7200 },
+    { type: 'clip', id: 'C', src: null, label: 'Plate puzzle',
+      hint: 'Steps on — door opens. Steps off — door closes. Timer counting.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-04-the-man.html',       label: '04 · The Man',         duration: 7200 },
+    { type: 'clip', id: 'D', src: null, label: 'Contradiction text',
+      hint: '“You know which corridors are load-bearing…”',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-05-the-loop.html',      label: '05 · The Loop',        duration: 7800 },
+    { type: 'clip', id: 'E', src: null, label: 'Timer death',
+      hint: 'Shake, red vignette, white flash, black. First death.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-06-shadows.html',       label: '06 · Shadows',         duration: 8000 },
+    { type: 'clip', id: 'F', src: null, label: 'First Shadow',
+      hint: 'Violet figure walks the path. Holds the plate. Player walks past himself.',
+      duration: 5000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-07-keepsakes.html',     label: '07 · Keepsakes',       duration: 9000 },
+    { type: 'clip', id: 'G', src: null, label: 'Collecting the watch',
+      hint: 'Warm shelf light. Three ascending tones. +5s.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-08-the-letter.html',    label: '08 · The Letter',      duration: 9000 },
+    { type: 'clip', id: 'H', src: null, label: 'Sorting bay',
+      hint: 'Unclaimed effects. Badge — name yours, date wrong.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-09-the-sacrifice.html', label: '09 · The Sacrifice',   duration: 7600 },
+    { type: 'clip', id: 'I', src: null, label: 'Press sacrifice',
+      hint: 'Climbs into the pit. Waits. Impact. Shadow holds — he crosses.',
+      duration: 5000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-10-observation.html',   label: '10 · Observation',     duration: 7600 },
+    { type: 'clip', id: 'J', src: null, label: 'Observation deck',
+      hint: 'Elevator up. Looking down from the glass. Dead monitor.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-11-the-workforce.html', label: '11 · The Workforce',   duration: 8600 },
+    { type: 'clip', id: 'K', src: null, label: 'Four Shadows working',
+      hint: 'Wide shot. Four figures at four heights. They are the light.',
+      duration: 5000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-12-the-drawing.html',   label: '12 · The Drawing',     duration: 8600 },
+    { type: 'clip', id: 'L', src: null, label: 'Drawing + final door',
+      hint: 'Keepsake reveal. Final door. Win chord — four notes.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-13-the-return.html',    label: '13 · The Return',      duration: 8000 },
+    { type: 'clip', id: 'M', src: null, label: 'Ending pull-back',
+      hint: 'Camera eases back. Every Shadow still finishing. He keeps walking.',
+      duration: 5000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-14-the-door.html',      label: '14 · The Door',        duration: 6200 },
+    { type: 'clip', id: 'N', src: null, label: 'Fade to black',
+      hint: 'He walks forward. Camera recedes. Silence.',
+      duration: 4000, skipIfEmpty: true },
+
+    { type: 'card', src: 'card-15-fourteen-years.html', label: '15 · Fourteen Years', duration: 7000 },
+    { type: 'card', src: 'card-16-title.html',          label: '16 · Title',          duration: 6500 },
+  ];
+
+  // Build playable list (skip empty clips when skipIfEmpty)
+  const playlist = SEQUENCE.filter(s => {
+    if (s.type === 'clip' && !s.src && s.skipIfEmpty !== false) return false;
+    return true;
+  });
+
+  const stage = document.getElementById('stage');
+  const chrome = document.getElementById('chrome');
+  const progressBar = document.getElementById('progress-bar');
+  const slideMeta = document.getElementById('slide-meta');
+  const startScreen = document.getElementById('start-screen');
+  const btnPause = document.getElementById('btn-pause');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+
+  let index = 0;
+  let playing = false;
+  let paused = false;
+  let timer = null;
+  let startedAt = 0;
+  let remaining = 0;
+  let currentDuration = 0;
+  let progressRaf = null;
+  let currentEl = null;
+  let currentVideo = null;
+  let chromeHideTimer = null;
+
+  function buildSlide(item) {
+    const el = document.createElement('div');
+    el.className = 'slide';
+
+    if (item.type === 'card') {
+      const iframe = document.createElement('iframe');
+      iframe.src = item.src;
+      iframe.setAttribute('title', item.label);
+      el.appendChild(iframe);
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'clip';
+
+      const ph = document.createElement('div');
+      ph.className = 'placeholder';
+      ph.innerHTML =
+        `<div class="clip-label">Gameplay Clip ${item.id || ''}</div>` +
+        `<div class="clip-title">${item.label || ''}</div>` +
+        `<div class="clip-hint">${item.hint || 'Drop a video in trailer/clips/ and set src in SEQUENCE.'}</div>` +
+        (item.src
+          ? `<div class="clip-file">${item.src}</div>`
+          : `<div class="clip-file">no video yet · holding ${((item.duration || 4000) / 1000).toFixed(1)}s</div>`);
+      wrap.appendChild(ph);
+
+      if (item.src) {
+        const video = document.createElement('video');
+        video.src = item.src;
+        video.playsInline = true;
+        video.preload = 'auto';
+        video.setAttribute('playsinline', '');
+        wrap.appendChild(video);
+        el._video = video;
+        el._placeholder = ph;
+      }
+
+      el.appendChild(wrap);
+    }
+
+    el._item = item;
+    return el;
+  }
+
+  function clearTimer() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = null; }
+  }
+
+  function updateProgress() {
+    if (!playing || paused || !currentDuration) return;
+    const elapsed = performance.now() - startedAt;
+    const pct = Math.min(100, (elapsed / currentDuration) * 100);
+    progressBar.style.width = pct + '%';
+    if (pct < 100) progressRaf = requestAnimationFrame(updateProgress);
+  }
+
+  function scheduleAdvance(ms) {
+    clearTimer();
+    currentDuration = ms;
+    remaining = ms;
+    startedAt = performance.now();
+    progressBar.style.width = '0%';
+    progressRaf = requestAnimationFrame(updateProgress);
+    timer = setTimeout(() => {
+      if (!paused) next();
+    }, ms);
+  }
+
+  function showSlide(i, { restart = true } = {}) {
+    clearTimer();
+    if (currentVideo) {
+      currentVideo.pause();
+      currentVideo.onended = null;
+      currentVideo = null;
+    }
+
+    const item = playlist[i];
+    if (!item) {
+      endTrailer();
+      return;
+    }
+
+    const prev = currentEl;
+    const el = buildSlide(item);
+    stage.appendChild(el);
+
+    // Force reflow then fade in
+    void el.offsetWidth;
+    el.classList.add('active');
+
+    if (prev) {
+      prev.classList.remove('active');
+      prev.classList.add('leaving');
+      setTimeout(() => prev.remove(), 750);
+    }
+
+    currentEl = el;
+    index = i;
+    slideMeta.textContent = `${i + 1} / ${playlist.length}  ·  ${item.label}`;
+    progressBar.style.width = '0%';
+
+    if (!playing || paused) return;
+
+    if (item.type === 'clip' && el._video) {
+      const video = el._video;
+      currentVideo = video;
+      video.currentTime = 0;
+      const tryPlay = video.play();
+      if (tryPlay && tryPlay.catch) tryPlay.catch(() => {});
+
+      video.onloadeddata = () => {
+        if (el._placeholder) el._placeholder.classList.add('hidden');
+      };
+      video.onended = () => { if (!paused) next(); };
+
+      // Progress from video time
+      clearTimer();
+      const track = () => {
+        if (!currentVideo || paused) return;
+        if (video.duration && isFinite(video.duration)) {
+          currentDuration = video.duration * 1000;
+          progressBar.style.width = ((video.currentTime / video.duration) * 100) + '%';
+        }
+        progressRaf = requestAnimationFrame(track);
+      };
+      progressRaf = requestAnimationFrame(track);
+
+      // Safety: if video fails to load, fall back to duration
+      video.onerror = () => {
+        if (el._placeholder) el._placeholder.classList.remove('hidden');
+        scheduleAdvance(item.duration || 4000);
+      };
+    } else {
+      scheduleAdvance(item.duration || 6000);
+    }
+  }
+
+  function next() {
+    if (index >= playlist.length - 1) {
+      endTrailer();
+      return;
+    }
+    showSlide(index + 1);
+  }
+
+  function prev() {
+    if (index <= 0) return;
+    showSlide(index - 1);
+  }
+
+  function pause() {
+    if (!playing || paused) return;
+    paused = true;
+    remaining = Math.max(0, currentDuration - (performance.now() - startedAt));
+    clearTimer();
+    if (currentVideo) currentVideo.pause();
+    btnPause.textContent = 'Play';
+  }
+
+  function resume() {
+    if (!playing || !paused) return;
+    paused = false;
+    btnPause.textContent = 'Pause';
+    if (currentVideo) {
+      currentVideo.play().catch(() => {});
+      const track = () => {
+        if (!currentVideo || paused) return;
+        if (currentVideo.duration && isFinite(currentVideo.duration)) {
+          progressBar.style.width = ((currentVideo.currentTime / currentVideo.duration) * 100) + '%';
+        }
+        progressRaf = requestAnimationFrame(track);
+      };
+      progressRaf = requestAnimationFrame(track);
+    } else {
+      scheduleAdvance(remaining || 1000);
+    }
+  }
+
+  function togglePause() {
+    if (paused) resume();
+    else pause();
+  }
+
+  function endTrailer() {
+    playing = false;
+    paused = false;
+    clearTimer();
+    if (currentVideo) { currentVideo.pause(); currentVideo = null; }
+    progressBar.style.width = '100%';
+    slideMeta.textContent = 'End';
+
+    const end = document.createElement('div');
+    end.id = 'end-screen';
+    end.className = 'slide active';
+    end.innerHTML =
+      `<div style="font-family:var(--sans);font-size:clamp(1.8rem,5.5vw,4.5rem);font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:var(--violet);text-shadow:0 0 60px rgba(179,136,255,.4);text-align:center;max-width:92vw;line-height:1.15">The Last Shift</div>` +
+      `<button class="replay" type="button" id="btn-replay">Replay</button>`;
+    // Reuse end-screen styles via inline minimal + existing #end-screen if present
+    end.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000;';
+    if (currentEl) {
+      currentEl.classList.remove('active');
+      currentEl.classList.add('leaving');
+      setTimeout(() => currentEl && currentEl.remove(), 750);
+    }
+    stage.appendChild(end);
+    currentEl = end;
+    document.getElementById('btn-replay').onclick = () => startTrailer();
+    document.body.classList.add('show-cursor');
+    chrome.classList.add('visible');
+  }
+
+  function startTrailer() {
+    stage.innerHTML = '';
+    currentEl = null;
+    currentVideo = null;
+    index = 0;
+    playing = true;
+    paused = false;
+    btnPause.textContent = 'Pause';
+    document.body.classList.remove('show-cursor');
+    showSlide(0);
+  }
+
+  // Start screen
+  startScreen.addEventListener('click', () => {
+    startScreen.classList.add('gone');
+    setTimeout(() => startScreen.remove(), 900);
+    startTrailer();
+  });
+
+  btnPause.addEventListener('click', (e) => { e.stopPropagation(); togglePause(); });
+  btnNext.addEventListener('click', (e) => { e.stopPropagation(); if (playing) next(); });
+  btnPrev.addEventListener('click', (e) => { e.stopPropagation(); if (playing) prev(); });
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (!playing && e.code !== 'Space' && e.code !== 'Enter') return;
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      if (startScreen.parentNode) {
+        startScreen.click();
+        return;
+      }
+      togglePause();
+    }
+    if (e.code === 'ArrowRight' || e.code === 'KeyN') { e.preventDefault(); next(); }
+    if (e.code === 'ArrowLeft' || e.code === 'KeyP') { e.preventDefault(); prev(); }
+    if (e.code === 'Escape') pause();
+  });
+
+  // Click stage to skip / show chrome
+  stage.addEventListener('click', () => {
+    if (!playing) return;
+    next();
+  });
+
+  // Mouse — show chrome briefly
+  let mouseIdle;
+  document.addEventListener('mousemove', () => {
+    document.body.classList.add('show-cursor');
+    chrome.classList.add('visible');
+    clearTimeout(mouseIdle);
+    mouseIdle = setTimeout(() => {
+      if (playing && !paused) {
+        document.body.classList.remove('show-cursor');
+        chrome.classList.remove('visible');
+      }
+    }, 2200);
+  });
+  </script>
+</body>
+</html>

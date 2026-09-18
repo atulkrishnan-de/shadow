@@ -1,4 +1,4 @@
-# SHADOW
+# The Last Shift
 
 A top-down quarter-view metroidvania puzzle game. Every time you die, your previous run comes back
 as a Shadow that repeats exactly what you did. You solve each room by building a

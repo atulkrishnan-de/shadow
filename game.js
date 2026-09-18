@@ -1,5 +1,5 @@
 /* ============================================================================
-   SHADOW — metroidvania facility. One continuous map, countdown timer,
+   The Last Shift — metroidvania facility. One continuous map, countdown timer,
    persistent shadow clones replaying every run. Keepsakes extend the clock;
    abilities unlock dash. Play plane: X/Z floor, Y vertical.
    ========================================================================== */
@@ -1916,7 +1916,7 @@ function startGame() {
   G.state = 'intro'; G.timers.intro = 0; G.camPull = 0.5;
   UI.card.classList.add('on');
   $('#roomcard .n').textContent = 'FACILITY';
-  $('#roomcard .t').textContent = 'SHADOW';
+  $('#roomcard .t').textContent = 'THE LAST SHIFT';
   $('#roomcard .s').textContent = 'one map · many of you';
   if (!G.hintShown) {
     UI.hint.innerHTML = 'The clock runs out. What you did comes back and does it again.<br>Find keepsakes. Leave Shadows. You will not get through alone.';

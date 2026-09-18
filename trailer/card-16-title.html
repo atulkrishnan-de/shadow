@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Last Shift — Card 16 · Title</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .title-card .line-title {
+      opacity: 0;
+      animation: fadeIn 3s ease forwards, glowPulse 4s ease-in-out infinite;
+      animation-delay: 1.2s, 4.2s;
+    }
+    .title-card .tagline {
+      font-family: var(--mono);
+      font-size: clamp(0.6rem, 1vw, 0.9rem);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-top: 2em;
+      opacity: 0;
+      animation: fadeIn 2s ease forwards;
+      animation-delay: 3.8s;
+    }
+  </style>
+</head>
+<body>
+<div class="card title-card">
+
+  <p class="line line-title">The Last Shift</p>
+
+  <p class="tagline">use your past · you cannot fix it</p>
+
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+</div>
+</body>
+</html>
