@@ -1,4 +1,4 @@
-/* ─── SHADOW Trailer Flashcards — Shared Styles ─── */
+/* ─── The Last Shift Trailer Flashcards — Shared Styles ─── */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
 
@@ -90,12 +90,14 @@ html, body {
 }
 
 .line-title {
-  font-size: clamp(4rem, 10vw, 10rem);
+  font-size: clamp(2.2rem, 6.5vw, 6.5rem);
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--violet);
   text-shadow: 0 0 60px rgba(179,136,255,0.4), 0 0 120px rgba(179,136,255,0.15);
+  max-width: 92vw;
+  line-height: 1.15;
 }
 
 .line-room {
