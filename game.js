@@ -52,7 +52,7 @@ addEventListener('keydown', e => {
     if (tag) tag.classList.toggle('on', G.dev);
     if (G.dev && G.player) {
       G.player.alive = true; G.player.rig.group.visible = true;
-      if (G.state === 'dying') G.state = 'play';
+      if (G.state === 'dying' || G.state === 'dead' || G.state === 'rewinding') G.state = 'play';
     }
   }
   if (anyKeyHook) { const f = anyKeyHook; anyKeyHook = null; f(); }
@@ -1629,7 +1629,24 @@ function killPlayer(cause) {
   if (G.state !== 'play' || G.dev) return;
   G.state = 'dying'; G.deathCause = cause; G.timers.death = 0; G.shake = 1.0;
   Audio.S.die(); flash(0.14);
-  G.player.alive = false; G.player.rig.group.visible = false;
+  G.player.alive = false;
+
+  const rig = G.player.rig;
+  if (rig.isGLTF && !rig.isShadow) {
+    rig._origMats = [];
+    const glitchMat = makeShadowMaterial();
+    glitchMat.uniforms.uColor.value.set(0xff2222);
+    glitchMat.uniforms.uGlow.value.set(0xff4444);
+    glitchMat.uniforms.uOpacity.value = 0.7;
+    glitchMat.uniforms.uGlitch.value = 1;
+    rig.group.traverse(o => {
+      if (o.isMesh || o.isSkinnedMesh) {
+        rig._origMats.push({ mesh: o, mat: o.material });
+        o.material = glitchMat;
+      }
+    });
+    rig._glitchMat = glitchMat;
+  }
 }
 
 function commitDeath() {
@@ -1914,8 +1931,52 @@ function frame(now) {
     }
   } else if (G.state === 'dying') {
     G.timers.death += dt;
-    if (G.timers.death > 0.35) { G.state = 'dead'; UI.deathprompt.style.opacity = '1'; UI.vignette.style.background = ''; }
+    const rig = G.player.rig;
+    if (rig._glitchMat) {
+      const t = performance.now() * 0.001;
+      rig._glitchMat.uniforms.uTime.value = t;
+      rig._glitchMat.uniforms.uGlitch.value = 1;
+      rig._glitchMat.uniforms.uOpacity.value = 0.7 - G.timers.death * 0.6;
+    }
+    if (rig.mixer) rig.mixer.update(dt);
+    if (G.timers.death > 0.6) {
+      rig.group.visible = false;
+      G.state = 'rewinding';
+      G.rewindIdx = G.rec.length - 1;
+      G.rewindSpeed = 16;
+    }
     updateCamera(dt);
+  } else if (G.state === 'rewinding') {
+    const stepsPerFrame = Math.ceil(G.rewindSpeed * dt * 60);
+    for (let i = 0; i < stepsPerFrame && G.rewindIdx > 0; i++) {
+      G.rewindIdx--;
+    }
+    G.rewindSpeed = Math.min(G.rewindSpeed + dt * 30, 80);
+
+    const frame = G.rec[G.rewindIdx];
+    if (frame) {
+      G.player.x = frame.x; G.player.y = frame.y; G.player.z = frame.z;
+      G.player.vx = 0; G.player.vz = 0;
+      G.player.rig.group.position.set(frame.x, frame.y, frame.z);
+      G.player.rig.group.visible = true;
+      if (G.player.rig._glitchMat) {
+        G.player.rig._glitchMat.uniforms.uTime.value = performance.now() * 0.001;
+        G.player.rig._glitchMat.uniforms.uOpacity.value = 0.35;
+      }
+    }
+
+    for (const s of G.shadows) {
+      if (!s.alive) continue;
+      const si = Math.min(G.rewindIdx, s.tape.length - 1);
+      if (si >= 0) s.playback(s.tape[si], si);
+    }
+
+    updateCamera(dt);
+    if (G.rewindIdx <= 0) {
+      G.state = 'dead';
+      UI.deathprompt.style.opacity = '1';
+      UI.vignette.style.background = '';
+    }
   } else if (G.state === 'dead') {
     if (Pressed.KeyR) { Pressed.KeyR = false; UI.deathprompt.style.opacity = '0'; commitDeath(); }
     updateCamera(dt);
