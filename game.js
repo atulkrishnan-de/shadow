@@ -11,13 +11,14 @@ const TICK = 1 / 60;
 const STEP_MAX = 0.46;
 const SPAWN = { x: 2, y: 0, z: 3 };
 const MAX_SHADOWS = 12;
-const FACILITY = { x0: -2, x1: 58, z0: -6, z1: 18, ceil: 4 };
+const FACILITY = { x0: -2, x1: 45, z0: -6, z1: 18, ceil: 4 };
 
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEV_AUTO = URL_PARAMS.has('auto');
 const DEV_DEBUG = URL_PARAMS.has('debug');
 const DEV_GHOSTS = parseInt(URL_PARAMS.get('ghosts') || '0', 10) || 0;
-const DEV_SKIP_INTRO = URL_PARAMS.has('skipintro');
+// const DEV_SKIP_INTRO = URL_PARAMS.has('skipintro');
+const DEV_SKIP_INTRO = true;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -1587,7 +1588,7 @@ function buildFacility() {
   addLighting();
 }
 
-const PH = { R: 0.34, ACCEL: 72, FRICTION: 55, MAX: 8.5, DASH_SPEED: 18, DASH_DUR: 0.28, DASH_CD: 1.0 };
+const PH = { R: 0.34, ACCEL: 50, FRICTION: 55, MAX: 7, DASH_SPEED: 18, DASH_DUR: 0.28, DASH_CD: 1.0 };
 
 function groundAt(x, z, curY) {
   let g = 0;
