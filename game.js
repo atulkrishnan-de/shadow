@@ -1916,8 +1916,8 @@ function startGame() {
   G.state = 'intro'; G.timers.intro = 0; G.camPull = 0.5;
   UI.card.classList.add('on');
   $('#roomcard .n').textContent = 'FACILITY';
-  $('#roomcard .t').textContent = 'THE LAST SHIFT';
-  $('#roomcard .s').textContent = 'one map · many of you';
+  $('#roomcard .t').textContent = 'THE SHIFT STARTS';
+  $('#roomcard .s').textContent = 'One map. Many of you.';
   if (!G.hintShown) {
     UI.hint.innerHTML = 'The clock runs out. What you did comes back and does it again.<br>Find keepsakes. Leave Shadows. You will not get through alone.';
     UI.hint.classList.add('on');
